@@ -40,7 +40,7 @@ func (ss *SortedSlice) Add(val Comparator) (int, error) {
 		return -1, errors.New("val=nil cannot be added to the collection.")
 	}
 
-	idx := ss.getInsertPos(val)
+	idx := ss.GetInsertPos(val)
 	if idx >= ss.Len() {
 		ss.data = append(ss.data, val)
 	} else {
@@ -79,6 +79,23 @@ func (ss *SortedSlice) Copy() []Comparator {
 	return c
 }
 
+func (ss *SortedSlice) GetInsertPos(val Comparator) int {
+	len := len(ss.data)
+	if len == 0 {
+		return 0
+	}
+
+	if val.Compare(ss.data[len-1]) >= 0 {
+		return len
+	}
+
+	idx := ss.binarySearch(val)
+	if idx < 0 {
+		return -(idx + 1)
+	}
+	return idx
+}
+
 func (ss *SortedSlice) binarySearch(val Comparator) int {
 	h := len(ss.data) - 1
 	l := 0
@@ -96,21 +113,4 @@ func (ss *SortedSlice) binarySearch(val Comparator) int {
 		}
 	}
 	return -(l + 1)
-}
-
-func (ss *SortedSlice) getInsertPos(val Comparator) int {
-	len := len(ss.data)
-	if len == 0 {
-		return 0
-	}
-
-	if val.Compare(ss.data[len-1]) >= 0 {
-		return len
-	}
-
-	idx := ss.binarySearch(val)
-	if idx < 0 {
-		return -idx - 1
-	}
-	return idx
 }
