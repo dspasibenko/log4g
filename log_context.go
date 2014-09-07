@@ -2,6 +2,7 @@ package log4g
 
 import (
 	"errors"
+	"github.com/dspasibenko/log4g/collections"
 	"strconv"
 )
 
@@ -48,6 +49,14 @@ func endQuietly() {
 	recover()
 }
 
+func getLogLevelContext(loggerName string, logContexts *collections.SortedSlice) *logContext {
+	lProvider := getNearestAncestor(&logContext{loggerName: loggerName}, logContexts)
+	if lProvider == nil {
+		return nil
+	}
+	return lProvider.(*logContext)
+}
+
 /**
  * Send the logEvent to all the logContext appenders.
  * Returns true if the logEvent was sent and false if the context is shut down
@@ -70,4 +79,14 @@ func (lc *logContext) onEvent(le *LogEvent) {
 func (lc *logContext) shutdown() {
 	close(lc.eventsCh)
 	<-lc.controlCh
+}
+
+// logNameProvider implementation
+func (lc *logContext) name() string {
+	return lc.loggerName
+}
+
+// Comparator implementation
+func (lc *logContext) Compare(other collections.Comparator) int {
+	return compare(lc, other.(*logContext))
 }

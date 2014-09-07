@@ -1,14 +1,18 @@
 package log4g
 
+import "time"
+
 type Level int
 
+const levelStep = 10
 const (
-	FATAL Level = iota
+	FATAL Level = levelStep*iota + levelStep
 	ERROR
 	WARN
 	INFO
 	DEBUG
 	TRACE
+	ALL
 )
 
 type Logger interface {
@@ -22,17 +26,15 @@ type Logger interface {
 	Log(level Level, payload interface{})
 }
 
-type Timestamp uint64
-
 type LogEvent struct {
-	level     Level
-	timestamp Timestamp
-	logger    string
-	payload   interface{}
+	Level      Level
+	Timestamp  time.Time
+	LoggerName string
+	Payload    interface{}
 }
 
 type Appender interface {
-	Append(record *LogEvent)
+	Append(event *LogEvent)
 }
 
 type NewAppenderFn func(map[string]interface{}) Appender
@@ -43,6 +45,15 @@ type NewAppenderFn func(map[string]interface{}) Appender
  */
 func GetLogger(name string) Logger {
 	return lm.getLogger(name)
+}
+
+/**
+ * Returns slice with log level names. Changing the appropriate level name here will
+ * follow to changing its name in log messages for appenders that form the message
+ * from LogEvent
+ */
+func LevelNames() []string {
+	return lm.levelNames
 }
 
 /**
@@ -59,7 +70,7 @@ func RegisterAppender(appenderName string, newAppenderFn NewAppenderFn) error {
 
 /**
  * Should be called to shutdown log subsystem properly. It will notify all logContexts and wait
- * while all go routines are over. To call this method could be essential to finalize some 
+ * while all go routines are over. To call this method could be essential to finalize some
  * appenders implementations and close them properly
  */
 func Shutdown() {

@@ -14,6 +14,7 @@ type logManager struct {
 	logContexts *collections.SortedSlice
 	appenders   map[string]*appenderHolder
 	rwLock      sync.RWMutex
+	levelNames  []string
 }
 
 type appenderHolder struct {
@@ -29,6 +30,17 @@ func init() {
 
 	lm.loggers = make(map[string]*logger)
 	lm.loggers[rootLoggerName] = &logger{rootLoggerName, rootLLS, rootLLS.level}
+	lm.logContexts, _ = collections.NewSortedSlice(2)
+	lm.appenders = make(map[string]*appenderHolder)
+
+	lm.levelNames = make([]string, ALL+1)
+	lm.levelNames[FATAL] = "FATAL"
+	lm.levelNames[ERROR] = "ERROR"
+	lm.levelNames[WARN] = "WARN "
+	lm.levelNames[INFO] = "INFO "
+	lm.levelNames[DEBUG] = "DEBUG"
+	lm.levelNames[TRACE] = "TRACE"
+	lm.levelNames[ALL] = "ALL  "
 }
 
 func (lm *logManager) getLogger(loggerName string) Logger {
