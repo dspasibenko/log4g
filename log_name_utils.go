@@ -51,7 +51,7 @@ func getNearestAncestor(comparator collections.Comparator, names *collections.So
 		return nil
 	}
 	nProvider := comparator.(logNameProvider)
-	for idx := min(names.Len()-1, names.GetInsertPos(nProvider.(collections.Comparator))); idx >= 0; idx-- {
+	for idx := Min(names.Len()-1, names.GetInsertPos(nProvider.(collections.Comparator))); idx >= 0; idx-- {
 		candidate := names.At(idx).(logNameProvider)
 		if ancestor(candidate.name(), nProvider.name()) {
 			return candidate
@@ -60,11 +60,17 @@ func getNearestAncestor(comparator collections.Comparator, names *collections.So
 	return nil
 }
 
-func min(a, b int) int {
+// Utility methods
+
+func Min(a, b int) int {
 	if a < b {
 		return a
 	} else if b < a {
 		return b
 	}
 	return a
+}
+
+func EndQuietly() {
+	recover()
 }

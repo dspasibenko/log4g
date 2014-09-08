@@ -45,10 +45,6 @@ func onStop(controlCh chan bool) {
 	close(controlCh)
 }
 
-func endQuietly() {
-	recover()
-}
-
 func getLogLevelContext(loggerName string, logContexts *collections.SortedSlice) *logContext {
 	lProvider := getNearestAncestor(&logContext{loggerName: loggerName}, logContexts)
 	if lProvider == nil {
@@ -64,7 +60,7 @@ func getLogLevelContext(loggerName string, logContexts *collections.SortedSlice)
 func (lc *logContext) log(le *LogEvent) (result bool) {
 	// Channel can be already closed, so end quietly
 	result = false
-	defer endQuietly()
+	defer EndQuietly()
 	lc.eventsCh <- le
 	return true
 }

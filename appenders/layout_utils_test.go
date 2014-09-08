@@ -1,7 +1,6 @@
 package appenders
 
 import (
-	//"github.com/dspasibenko/log4g/collections"
 	"github.com/dspasibenko/log4g"
 	. "gopkg.in/check.v1"
 	"testing"

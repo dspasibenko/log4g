@@ -34,10 +34,16 @@ type LogEvent struct {
 }
 
 type Appender interface {
-	Append(event *LogEvent)
+	Append(event *LogEvent) bool
 }
 
-type NewAppenderFn func(map[string]interface{}) Appender
+// The factory allows to create an appender instances
+type AppenderFactory interface {
+	// Appender name
+	Name() string
+	NewAppender(map[string]interface{}) (Appender, error)
+	Shutdown()
+}
 
 /**
  * Provides pointer to the logger with specified name.
@@ -60,12 +66,11 @@ func LevelNames() []string {
  * All appenders should register them in their module init() method.
  * The method returns error if the function is called after config intialization sub-system.
  * Parameters:
- *		appenderName - name of the appender, this name can be present in config file
- *		newAppender - function which allows to create the appender instance. It
- *				expects map of named params to their values.
+ *		appenderFactory - interface which allows to create new instances of
+ * 			some specific appender type.
  */
-func RegisterAppender(appenderName string, newAppenderFn NewAppenderFn) error {
-	return lm.registerAppender(appenderName, newAppenderFn)
+func RegisterAppender(appenderFactory AppenderFactory) error {
+	return lm.registerAppender(appenderFactory)
 }
 
 /**

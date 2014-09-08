@@ -69,6 +69,7 @@ func (s *logContextSuite) TestGetLogLevelContext(c *C) {
 	c.Assert(getLogLevelContext("b", ss).loggerName, Equals, "b")
 }
 
-func (lcs *logContextSuite) Append(logEvent *LogEvent) {
+func (lcs *logContextSuite) Append(logEvent *LogEvent) bool {
 	lcs.logEvent = logEvent
+	return true
 }

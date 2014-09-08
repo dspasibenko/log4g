@@ -12,13 +12,9 @@ type logManager struct {
 	loggers     map[string]*logger
 	logLevels   *collections.SortedSlice
 	logContexts *collections.SortedSlice
-	appenders   map[string]*appenderHolder
+	appenders   map[string]AppenderFactory
 	rwLock      sync.RWMutex
 	levelNames  []string
-}
-
-type appenderHolder struct {
-	newFunc NewAppenderFn
 }
 
 var lm logManager
@@ -31,7 +27,7 @@ func init() {
 	lm.loggers = make(map[string]*logger)
 	lm.loggers[rootLoggerName] = &logger{rootLoggerName, rootLLS, rootLLS.level}
 	lm.logContexts, _ = collections.NewSortedSlice(2)
-	lm.appenders = make(map[string]*appenderHolder)
+	lm.appenders = make(map[string]AppenderFactory)
 
 	lm.levelNames = make([]string, ALL+1)
 	lm.levelNames[FATAL] = "FATAL"
@@ -66,17 +62,17 @@ func (lm *logManager) setLogLevel(loggerName string, level Level) {
 	applyNewLevelToLoggers(lls, lm.loggers)
 }
 
-func (lm *logManager) registerAppender(appenderName string, newAppenderFn NewAppenderFn) error {
+func (lm *logManager) registerAppender(appenderFactory AppenderFactory) error {
 	lm.rwLock.Lock()
 	defer lm.rwLock.Unlock()
 
-	appenderName = normalizeLogName(appenderName)
+	appenderName := normalizeLogName(appenderFactory.Name())
 	_, ok := lm.appenders[appenderName]
 	if ok {
-		return errors.New("Cannot register appender with the name " + appenderName +
-			" because appender with the name is already registerd ")
+		return errors.New("Cannot register appender factory for the name " + appenderName +
+			" because the name is already registerd ")
 	}
 
-	lm.appenders[appenderName] = &appenderHolder{newFunc: newAppenderFn}
+	lm.appenders[appenderName] = appenderFactory
 	return nil
 }
