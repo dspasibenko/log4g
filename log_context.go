@@ -67,7 +67,12 @@ func (lc *logContext) log(le *LogEvent) (result bool) {
 
 // Called from processing go routine
 func (lc *logContext) onEvent(le *LogEvent) {
-	for _, a := range lc.appenders {
+	appenders := lc.appenders
+	if len(appenders) == 1 {
+		appenders[0].Append(le)
+		return
+	}
+	for _, a := range appenders {
 		a.Append(le)
 	}
 }

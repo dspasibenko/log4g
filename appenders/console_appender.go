@@ -47,13 +47,13 @@ func (*consoleAppenderFactory) Name() string {
 	return consoleAppenderName
 }
 
-func (caf *consoleAppenderFactory) NewAppender(params map[string]interface{}) (log4g.Appender, error) {
+func (caf *consoleAppenderFactory) NewAppender(params map[string]string) (log4g.Appender, error) {
 	layout, ok := params[CAParamLayout]
-	if !ok || len(layout.(string)) == 0 {
+	if !ok || len(layout) == 0 {
 		return nil, errors.New("Cannot create console appender without specified layout")
 	}
 
-	layoutTemplate, err := ParseLayout(layout.(string))
+	layoutTemplate, err := ParseLayout(layout)
 	if err != nil {
 		return nil, err
 	}

@@ -20,15 +20,15 @@ func (cas *cAppenderSuite) Write(p []byte) (n int, err error) {
 }
 
 func (s *cAppenderSuite) TestNewAppender(c *C) {
-	a, err := caFactory.NewAppender(map[string]interface{}{})
+	a, err := caFactory.NewAppender(map[string]string{})
 	c.Assert(a, IsNil)
 	c.Assert(err, NotNil)
 
-	a, err = caFactory.NewAppender(map[string]interface{}{"abcd": "1234"})
+	a, err = caFactory.NewAppender(map[string]string{"abcd": "1234"})
 	c.Assert(a, IsNil)
 	c.Assert(err, NotNil)
 
-	a, err = caFactory.NewAppender(map[string]interface{}{"layout": "%c %p"})
+	a, err = caFactory.NewAppender(map[string]string{"layout": "%c %p"})
 	c.Assert(a, NotNil)
 	c.Assert(err, IsNil)
 }
@@ -37,7 +37,7 @@ func (s *cAppenderSuite) TestAppend(c *C) {
 	s.signal = make(chan bool, 1)
 	caFactory.out = s
 
-	a, _ := caFactory.NewAppender(map[string]interface{}{"layout": "[%d{15:04:05.000}] %p %c: %m"})
+	a, _ := caFactory.NewAppender(map[string]string{"layout": "[%d{15:04:05.000}] %p %c: %m"})
 	appended := a.Append(&log4g.LogEvent{log4g.FATAL, time.Unix(123456, 0), "a.b.c", "Hello Console!"})
 	c.Assert(appended, Equals, true)
 	<-s.signal

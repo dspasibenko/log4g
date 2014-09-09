@@ -41,7 +41,7 @@ type Appender interface {
 type AppenderFactory interface {
 	// Appender name
 	Name() string
-	NewAppender(map[string]interface{}) (Appender, error)
+	NewAppender(map[string]string) (Appender, error)
 	Shutdown()
 }
 
@@ -56,7 +56,7 @@ func GetLogger(name string) Logger {
 /**
  * Returns slice with log level names. Changing the appropriate level name here will
  * follow to changing its name in log messages for appenders that form the message
- * from LogEvent
+ * by provided LogEvent values.
  */
 func LevelNames() []string {
 	return lm.levelNames
@@ -71,6 +71,15 @@ func LevelNames() []string {
  */
 func RegisterAppender(appenderFactory AppenderFactory) error {
 	return lm.registerAppender(appenderFactory)
+}
+
+/**
+ * Reads log4g configuration properties from text file, which name is provided as
+ * configFileName parameter.
+ */
+func Init(configFileName string) error {
+	//TODO implement it
+	return nil
 }
 
 /**
