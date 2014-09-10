@@ -24,7 +24,7 @@ type consoleAppenderFactory struct {
 
 var caFactory *consoleAppenderFactory
 
-func init() {
+func InitConsoleAppender() {
 	caFactory = &consoleAppenderFactory{make(chan string, 1000), os.Stdout}
 	err := log4g.RegisterAppender(caFactory)
 	if err != nil {
@@ -73,4 +73,8 @@ func (cAppender *consoleAppender) Append(event *log4g.LogEvent) (ok bool) {
 	caFactory.msgChannel <- msg
 	ok = true
 	return ok
+}
+
+func (cAppender *consoleAppender) Shutdown() {
+
 }

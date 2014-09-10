@@ -9,11 +9,12 @@ import (
 type logContext struct {
 	loggerName string
 	appenders  []Appender
+	inherited  bool
 	eventsCh   chan *LogEvent
 	controlCh  chan bool
 }
 
-func newLogContext(loggerName string, appenders []Appender, bufSize int) (*logContext, error) {
+func newLogContext(loggerName string, appenders []Appender, inherited bool, bufSize int) (*logContext, error) {
 	if bufSize <= 0 {
 		return nil, errors.New("Cannot create channel with non-positive size=" + strconv.Itoa(bufSize))
 	}
@@ -24,7 +25,7 @@ func newLogContext(loggerName string, appenders []Appender, bufSize int) (*logCo
 
 	eventsCh := make(chan *LogEvent, bufSize)
 	controlCh := make(chan bool, 1)
-	lc := &logContext{loggerName, appenders, eventsCh, controlCh}
+	lc := &logContext{loggerName, appenders, inherited, eventsCh, controlCh}
 
 	go func() {
 		defer onStop(controlCh)

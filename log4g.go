@@ -35,6 +35,7 @@ type LogEvent struct {
 
 type Appender interface {
 	Append(event *LogEvent) bool
+	Shutdown()
 }
 
 // The factory allows to create an appender instances
@@ -49,8 +50,12 @@ type AppenderFactory interface {
  * Provides pointer to the logger with specified name.
  * name can have 'dot' separated form.
  */
-func GetLogger(name string) Logger {
-	return lm.getLogger(name)
+func GetLogger(loggerName string) Logger {
+	return lm.getLogger(loggerName)
+}
+
+func SetLogLevel(loggerName string, level Level) {
+	lm.setLogLevel(loggerName, level)
 }
 
 /**
@@ -59,11 +64,11 @@ func GetLogger(name string) Logger {
  * by provided LogEvent values.
  */
 func LevelNames() []string {
-	return lm.levelNames
+	return lm.config.levelNames
 }
 
 /**
- * All appenders should register them in their module init() method.
+ * All appenders should register them in their module init() method or by calling this function directly.
  * The method returns error if the function is called after config intialization sub-system.
  * Parameters:
  *		appenderFactory - interface which allows to create new instances of

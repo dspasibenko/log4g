@@ -13,18 +13,18 @@ type logContextSuite struct {
 var _ = Suite(&logContextSuite{})
 
 func (s *logContextSuite) TestNewLogContext(c *C) {
-	lc, err := newLogContext("abc", nil, 10)
+	lc, err := newLogContext("abc", nil, true, 10)
 	c.Assert(lc, IsNil)
 	c.Assert(err, NotNil)
 
 	appenders := make([]Appender, 0, 10)
-	lc, err = newLogContext("abc", appenders, 10)
+	lc, err = newLogContext("abc", appenders, true, 10)
 	c.Assert(lc, IsNil)
 	c.Assert(err, NotNil)
 
 	appenders = append(appenders, s)
 	c.Assert(len(appenders), Equals, 1)
-	lc, err = newLogContext("abc", appenders, 0)
+	lc, err = newLogContext("abc", appenders, true, 0)
 	c.Assert(lc, IsNil)
 	c.Assert(err, NotNil)
 }
@@ -32,7 +32,7 @@ func (s *logContextSuite) TestNewLogContext(c *C) {
 func (s *logContextSuite) TestLogContextWorkflow(c *C) {
 	appenders := make([]Appender, 1, 10)
 	appenders[0] = s
-	lc, err := newLogContext("abc", appenders, 1)
+	lc, err := newLogContext("abc", appenders, true, 1)
 	c.Assert(lc, NotNil)
 	c.Assert(err, IsNil)
 
@@ -58,12 +58,12 @@ func (s *logContextSuite) TestGetLogLevelContext(c *C) {
 
 	appenders := make([]Appender, 1, 10)
 	appenders[0] = s
-	lc, _ := newLogContext("b", appenders, 1)
+	lc, _ := newLogContext("b", appenders, true, 1)
 	ss.Add(lc)
 	c.Assert(getLogLevelContext("a", ss), IsNil)
 	c.Assert(getLogLevelContext("b", ss), Equals, lc)
 
-	lc, _ = newLogContext("", appenders, 1)
+	lc, _ = newLogContext("", appenders, true, 1)
 	ss.Add(lc)
 	c.Assert(getLogLevelContext("a", ss).loggerName, Equals, "")
 	c.Assert(getLogLevelContext("b", ss).loggerName, Equals, "b")
@@ -72,4 +72,7 @@ func (s *logContextSuite) TestGetLogLevelContext(c *C) {
 func (lcs *logContextSuite) Append(logEvent *LogEvent) bool {
 	lcs.logEvent = logEvent
 	return true
+}
+
+func (lcs *logContextSuite) Shutdown() {
 }

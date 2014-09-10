@@ -39,97 +39,54 @@ func (s *nameUtilsSuite) TestGetSetLogLevel(c *C) {
 	c.Assert(getNearestAncestor(&nameUtilsSuite{"a.bc.d"}, ss).(*nameUtilsSuite).loggerName, Equals, "a")
 }
 
-func (s *nameUtilsSuite) TestGetAppenderName(c *C) {
-	a, ok := getAppenderName("abc")
+func (s *nameUtilsSuite) TestGetConfigParamName(c *C) {
+	ctx, ok := getConfigParamName("abc", "context", nil)
 	c.Assert(ok, Equals, false)
 
-	a, ok = getAppenderName("abc.asd.ab")
+	ctx, ok = getConfigParamName("abc.asd.ab", "context", nil)
 	c.Assert(ok, Equals, false)
 
-	a, ok = getAppenderName("appender.test")
-	c.Assert(ok, Equals, false)
-
-	a, ok = getAppenderName("appender..test")
-	c.Assert(ok, Equals, false)
-
-	a, ok = getAppenderName("appender...test")
-	c.Assert(ok, Equals, false)
-
-	a, ok = getAppenderName("appender.test.test")
-	c.Assert(ok, Equals, true)
-	c.Assert(a, Equals, "test")
-
-	a, ok = getAppenderName("appender.3test.test")
-	c.Assert(ok, Equals, false)
-
-	a, ok = getAppenderName("appender.t345est.test")
-	c.Assert(ok, Equals, true)
-	c.Assert(a, Equals, "t345est")
-}
-
-func (s *nameUtilsSuite) TestGetAppenderParam(c *C) {
-	c.Assert(getAppenderParam("appender."), Equals, "")
-	c.Assert(getAppenderParam("appender.ROOT.level"), Equals, "level")
-}
-
-func (s *nameUtilsSuite) TestGetContextLoggerName(c *C) {
-	ctx, ok := getContextLoggerName("abc")
-	c.Assert(ok, Equals, false)
-
-	ctx, ok = getContextLoggerName("abc.asd.ab")
-	c.Assert(ok, Equals, false)
-
-	ctx, ok = getContextLoggerName("context.test")
+	ctx, ok = getConfigParamName("context.test", "context", nil)
 	c.Assert(ok, Equals, true)
 	c.Assert(ctx, Equals, "")
 
-	ctx, ok = getContextLoggerName("context..test")
+	ctx, ok = getConfigParamName("context..test", "context", nil)
+	c.Assert(ok, Equals, true)
+	c.Assert(ctx, Equals, "")
+
+	ctx, ok = getConfigParamName("appender..test", "appender", isCorrectAppenderName)
 	c.Assert(ok, Equals, false)
 
-	ctx, ok = getContextLoggerName("context...test")
-	c.Assert(ok, Equals, false)
+	ctx, ok = getConfigParamName("context...test", "context", nil)
+	c.Assert(ok, Equals, true)
+	c.Assert(ctx, Equals, ".")
 
-	ctx, ok = getContextLoggerName("context.test.test")
+	ctx, ok = getConfigParamName("context.test.text", "context", nil)
 	c.Assert(ok, Equals, true)
 	c.Assert(ctx, Equals, "test")
 
-	ctx, ok = getContextLoggerName("context.a.b.c.test")
+	ctx, ok = getConfigParamName("context.a.b.c.test", "context", nil)
 	c.Assert(ok, Equals, true)
 	c.Assert(ctx, Equals, "a.b.c")
 }
 
-func (s *nameUtilsSuite) TestParseAppendersParams(c *C) {
-	params := parseAppendersParams(map[string]string{
-		"appender.ROOT.type": "123",
-		"abc":                "def",
-		"appender.app.type":  "345",
-		"appender.ROOT.ttt":  "qqq",
-	})
-	c.Assert(params["ROOT"]["type"], Equals, "123")
-	c.Assert(params["ROOT"]["ttt"], Equals, "qqq")
-	c.Assert(params["app"]["type"], Equals, "345")
-	c.Assert(params["app"]["ttt"], Equals, "")
-	c.Assert(params["abc"], IsNil)
+func (s *nameUtilsSuite) TestGetConfigParamAttribute(c *C) {
+	c.Assert(getConfigParamAttribute("appender."), Equals, "")
+	c.Assert(getConfigParamAttribute("appender.ROOT.level"), Equals, "level")
 }
 
-func (s *nameUtilsSuite) TestParseContextParams(c *C) {
-	params := parseContextParams(map[string]string{
+func (s *nameUtilsSuite) TestGroupConfigParams(c *C) {
+	params := groupConfigParams(map[string]string{
 		"context.ROOT.type": "123",
 		"abc":               "def",
 		"context.app.type":  "345",
 		"context.ROOT.ttt":  "qqq",
-	})
+	}, "context")
 	c.Assert(params["ROOT"]["type"], Equals, "123")
 	c.Assert(params["ROOT"]["ttt"], Equals, "qqq")
 	c.Assert(params["app"]["type"], Equals, "345")
 	c.Assert(params["app"]["ttt"], Equals, "")
 	c.Assert(params["abc"], IsNil)
-}
-
-func (s *nameUtilsSuite) TestGetContextParam(c *C) {
-	c.Assert(getAppenderParam("context."), Equals, "")
-	c.Assert(getAppenderParam("context.param"), Equals, "param")
-	c.Assert(getAppenderParam("context.a.b.c.param"), Equals, "param")
 }
 
 func (s *nameUtilsSuite) TestCorrectAppenderName(c *C) {

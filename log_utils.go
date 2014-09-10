@@ -10,14 +10,6 @@ type logNameProvider interface {
 	name() string
 }
 
-// Config params
-const (
-	cfgAppender     = "appender."
-	cfgAppenderType = "type"
-	cfgLevel        = "level."
-	cfgContext      = "context."
-)
-
 func compare(n1, n2 logNameProvider) int {
 	switch {
 	case n1.name() == n2.name():
@@ -67,59 +59,29 @@ func getNearestAncestor(comparator collections.Comparator, names *collections.So
 	return nil
 }
 
-// parses param and expect the appender name in the form: appender.<appenderName>.<appenderParam>
-func getAppenderName(param string) (string, bool) {
-	p := cfgAppender
-	if !strings.HasPrefix(param, p) {
+// Gets the name of a parameter provided in the form: <prefix>.<name>.<attribute>
+func getConfigParamName(param, prefix string, checker func(string) bool) (string, bool) {
+	pr := prefix + "."
+	if !strings.HasPrefix(param, pr) {
 		return "", false
 	}
 
-	start := len(p)
-	end := strings.LastIndex(param, ".")
-	if start >= end-1 {
-		return "", false
-	}
-
-	appenderName := param[start:end]
-	if !isCorrectAppenderName(appenderName) {
-		return "", false
-	}
-
-	return appenderName, true
-}
-
-// invariant: param has "appender." prefix
-func getAppenderParam(param string) string {
-	end := strings.LastIndex(param, ".")
-	if end == len(param)-1 {
-		return ""
-	}
-	return param[end+1:]
-}
-
-// parses param and expects the context logger name in the form: context.<loggerName>.<contextParam>
-func getContextLoggerName(param string) (string, bool) {
-	c := cfgContext
-	if !strings.HasPrefix(param, c) {
-		return "", false
-	}
-
-	start := len(c)
+	start := len(pr)
 	end := strings.LastIndex(param, ".")
 	if start == end+1 {
 		return "", true
 	}
 
-	loggerName := param[start:end]
-	if !isCorrectLoggerName(loggerName) {
+	paramName := param[start:end]
+	if checker != nil && !checker(paramName) {
 		return "", false
 	}
 
-	return loggerName, true
+	return paramName, true
 }
 
-// invariant: param has "context." prefix
-func getContextParam(param string) string {
+// Gets the attribute of a parameter provided in the form: <prefix>.<name>.<attribute>
+func getConfigParamAttribute(param string) string {
 	end := strings.LastIndex(param, ".")
 	if end == len(param)-1 {
 		return ""
@@ -127,43 +89,25 @@ func getContextParam(param string) string {
 	return param[end+1:]
 }
 
-func parseAppendersParams(params map[string]string) map[string]map[string]string {
-	// collect settings for all appenders from config
-	apps := make(map[string]map[string]string)
+// Groups params with the prefix by their names into a map of maps, where the second
+// map defines parameters for the particular key value (param name) from the first map
+func groupConfigParams(params map[string]string, prefix string) map[string]map[string]string {
+	resultMap := make(map[string]map[string]string)
 	for k, v := range params {
-		appName, ok := getAppenderName(k)
+		name, ok := getConfigParamName(k, prefix, nil)
 		if !ok {
 			continue
 		}
-		appParam := getAppenderParam(k)
+		attribute := getConfigParamAttribute(k)
 
-		m, ok := apps[appName]
+		m, ok := resultMap[name]
 		if !ok {
 			m = make(map[string]string)
-			apps[appName] = m
+			resultMap[name] = m
 		}
-		m[appParam] = v
+		m[attribute] = v
 	}
-	return apps
-}
-
-func parseContextParams(params map[string]string) map[string]map[string]string {
-	ctxts := make(map[string]map[string]string)
-	for k, v := range params {
-		logName, ok := getContextLoggerName(k)
-		if !ok {
-			continue
-		}
-		ctxParam := getContextParam(k)
-
-		m, ok := ctxts[logName]
-		if !ok {
-			m = make(map[string]string)
-			ctxts[logName] = m
-		}
-		m[ctxParam] = v
-	}
-	return ctxts
+	return resultMap
 }
 
 func isCorrectAppenderName(appenderName string) bool {

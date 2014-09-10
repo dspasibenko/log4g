@@ -13,6 +13,9 @@ type logLevelSetting struct {
  *		loggerName - should be eligable normalized logger name
  */
 func setLogLevel(level Level, loggerName string, logLevels *collections.SortedSlice) *logLevelSetting {
+	if level < 0 {
+		return nil
+	}
 	var lls *logLevelSetting = &logLevelSetting{loggerName, level}
 	idx, found := logLevels.Find(lls)
 	if found {

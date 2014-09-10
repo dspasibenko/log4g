@@ -14,10 +14,10 @@ func (s *loggerSuite) TestApplyNewLevelToLoggers(c *C) {
 	rootLLS := &logLevelSetting{rootLoggerName, INFO}
 
 	loggers := make(map[string]*logger)
-	loggers["a"] = &logger{"a", rootLLS, INFO}
-	loggers["a.b"] = &logger{"a.b", rootLLS, INFO}
-	loggers["a.b.c"] = &logger{"a.b.c", rootLLS, INFO}
-	loggers["a.b.c.d"] = &logger{"a.b.c.d", rootLLS, INFO}
+	loggers["a"] = &logger{"a", rootLLS, nil, INFO}
+	loggers["a.b"] = &logger{"a.b", rootLLS, nil, INFO}
+	loggers["a.b.c"] = &logger{"a.b.c", rootLLS, nil, INFO}
+	loggers["a.b.c.d"] = &logger{"a.b.c.d", rootLLS, nil, INFO}
 
 	applyNewLevelToLoggers(&logLevelSetting{"a.b", DEBUG}, loggers)
 	c.Assert(loggers["a"].logLevel, Equals, INFO)
