@@ -2,8 +2,11 @@ package log4g
 
 import "time"
 
+// Level type represents logging level as an integer in [0..70] range.
+// A level with lowest value has higher priority than a level with highest value.
 type Level int
 
+// Predefined log levels. Users can define own ones or overwrite the predefined via configuration
 const levelStep = 10
 const (
 	FATAL Level = levelStep*iota + levelStep
@@ -15,6 +18,7 @@ const (
 	ALL
 )
 
+// Logger interface provides methods for delivering messages to different appenders
 type Logger interface {
 	Fatal(args ...interface{})
 	Error(args ...interface{})
@@ -27,6 +31,7 @@ type Logger interface {
 	Logp(level Level, payload interface{})
 }
 
+// LogEvent is DTO, bearing a log message to log (final destination of the message)
 type LogEvent struct {
 	Level      Level
 	Timestamp  time.Time
@@ -34,6 +39,8 @@ type LogEvent struct {
 	Payload    interface{}
 }
 
+// Appender is an interface for a log endpoint. Different storages can be connected to the library
+// implementing the interface
 type Appender interface {
 	Append(event *LogEvent) bool
 	// should be called every time when the instance is not going to be used anymore
@@ -48,10 +55,9 @@ type AppenderFactory interface {
 	Shutdown()
 }
 
-/**
- * Provides pointer to the logger with specified name.
- * name can have 'dot' separated form.
- */
+// GetLogger returns pointer to the Logger object for specified logger name.
+// The function will always return the same pointer for the same logger's name
+// regardless of log4g configuration or other settings
 func GetLogger(loggerName string) Logger {
 	return lm.getLogger(loggerName)
 }
@@ -60,46 +66,29 @@ func SetLogLevel(loggerName string, level Level) {
 	lm.setLogLevel(loggerName, level)
 }
 
-/**
- * Returns slice with log level names. Changing the appropriate level name here will
- * follow to changing its name in log messages for appenders that form the message
- * by provided LogEvent values.
- */
-func LevelNames() []string {
-	return lm.config.levelNames
-}
-
-/**
- * All appenders should register them in their module init() method or by calling this function directly.
- * The method returns error if the function is called after config intialization sub-system.
- * Parameters:
- *		appenderFactory - interface which allows to create new instances of
- * 			some specific appender type.
- */
+// RegisterAppender allows to register an appender implementation in log4g. All appenders should register themself calling the
+// function from init() or by calling this function directly.
+// The method returns error if another factory has been registered for the same name before
+// Parameters:
+//		appenderFactory - a factory object which allows to create new instances of the appender type.
 func RegisterAppender(appenderFactory AppenderFactory) error {
 	return lm.registerAppender(appenderFactory)
 }
 
-/**
- * Reads log4g configuration properties from text file, which name is provided as
- * configFileName parameter.
- */
+// ConfigF reads log4g configuration properties from text file, which name is provided in
+// configFileName parameter.
 func ConfigF(configFileName string) error {
 	return lm.setPropsFromFile(configFileName)
 }
 
-/**
- * Configures log4g by key:value pairs provided as a map of properties
- */
+// Config allows to configure log4g by properties provided in the key:value form
 func Config(props map[string]string) error {
 	return lm.setNewProperties(props)
 }
 
-/**
- * Should be called to shutdown log subsystem properly. It will notify all logContexts and wait
- * while all go routines are over. To call this method could be essential to finalize some
- * appenders implementations and close them properly
- */
+// Should be called to shutdown log subsystem properly. It will notify all logContexts and wait
+// while all go routines that deliver messages to appenders are over. Calling this method could
+// be essential to finalize some appenders and release their resources properly
 func Shutdown() {
 	lm.shutdown()
 }

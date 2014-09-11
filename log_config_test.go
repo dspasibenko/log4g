@@ -2,6 +2,7 @@ package log4g
 
 import (
 	. "gopkg.in/check.v1"
+	"strings"
 )
 
 type logConfigSuite struct {
@@ -123,6 +124,84 @@ func (s *logConfigSuite) TestCreateLoggers(c *C) {
 			lc.createLoggers(map[string]string{
 				"logger.a.b.c.level": "ABC",
 			})
+		})
+	c.Assert(pnc, Equals, true)
+}
+
+func (s *logConfigSuite) TestCreateContexts(c *C) {
+	lc := newLogConfig()
+	c.Assert(lc.registerAppender(&testAppenderFactory{consoleAppenderName}), IsNil)
+	lc.initIfNeeded()
+
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": ""})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "abc,ROOT"})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
+		"context.a.b.c.level": "INFO34"})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
+		"context.a.b.c.buffer": "b1"})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
+		"context.a.b.c.buffer": "-1"})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
+		"context.a.b.c.inherited": "true3"})
+	lc.createContexts(nil)
+}
+
+func panicWhenCreateContext(c *C, lc *logConfig, params map[string]string) {
+	pnc := checkPanic(
+		func() {
+			lc.createContexts(params)
+		})
+	c.Assert(pnc, Equals, true)
+}
+
+func (s *logConfigSuite) TestCreateAppenders(c *C) {
+	lc := newLogConfig()
+	c.Assert(lc.registerAppender(&testAppenderFactory{consoleAppenderName}), IsNil)
+	lc.initIfNeeded()
+
+	lc.createAppenders(nil)
+	lc.createAppenders(map[string]string{"appender.ROOT.type": consoleAppenderName})
+
+	pnc := checkPanic(
+		func() {
+			lc.createAppenders(map[string]string{"appender.ROOT.type": "unknown appender"})
+		})
+	c.Assert(pnc, Equals, true)
+
+	pnc = checkPanic(
+		func() {
+			lc.createAppenders(map[string]string{"appender.ROOT.layot": "unknown layout %$"})
+		})
+	c.Assert(pnc, Equals, true)
+}
+
+func (s *logConfigSuite) TestApplyLevelParams(c *C) {
+	lc := newLogConfig()
+	c.Assert(lc.registerAppender(&testAppenderFactory{consoleAppenderName}), IsNil)
+	lc.initIfNeeded()
+
+	lc.applyLevelParams(nil)
+	checkLevelMapVsLevelName(c, lc)
+	lc.applyLevelParams(map[string]string{"level.34": "SEVERE34", "level.70": "L41"})
+	c.Assert(lc.levelNames[34], Equals, "SEVERE34")
+	c.Assert(lc.levelNames[70], Equals, "L41")
+	checkLevelMapVsLevelName(c, lc)
+
+	panicWhenApplyLevelParams(c, lc, map[string]string{"level.34": "SEVERE34", "level.-1": "L41"})
+	panicWhenApplyLevelParams(c, lc, map[string]string{"level.34": "SEVERE34", "level.71": "L41"})
+}
+
+func checkLevelMapVsLevelName(c *C, lc *logConfig) {
+	for levelName, idx := range lc.levelMap {
+		normLevel := strings.ToLower(strings.Trim(lc.levelNames[idx], " '"))
+		c.Assert(normLevel, Equals, levelName)
+	}
+}
+
+func panicWhenApplyLevelParams(c *C, lc *logConfig, params map[string]string) {
+	pnc := checkPanic(
+		func() {
+			lc.applyLevelParams(params)
 		})
 	c.Assert(pnc, Equals, true)
 }

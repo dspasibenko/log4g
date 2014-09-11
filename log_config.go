@@ -19,7 +19,7 @@ type logConfig struct {
 
 // Config params
 const (
-	// appender.console.type=log4g/appenders/consoleAppender
+	// appender.console.type=log4g/consoleAppender
 	cfgAppender     = "appender"
 	cfgAppenderType = "type"
 
@@ -129,15 +129,25 @@ func (lc *logConfig) setConfigParams(params map[string]string) {
 // Allows to specify custom level names in form level.X=<levelName>
 // for example: level.11=SEVERE
 func (lc *logConfig) applyLevelParams(params map[string]string) {
-	for i, _ := range lc.levelNames {
-		param := cfgLevel + "." + strconv.Itoa(i)
-		v, ok := params[param]
-		if ok {
-			lc.levelNames[i] = v
+	levels := groupConfigParams(params, cfgLevel, nil)
+	lvlMap, ok := levels[""]
+	if ok {
+		for levelNum, levelName := range lvlMap {
+			level, err := strconv.Atoi(levelNum)
+			if err != nil || level < 0 || level > int(ALL) {
+				panic("Incorrect log level id=" + strconv.Itoa(level) +
+					" provided with \"" + levelName + "\": the id should be in [0.." + strconv.Itoa(int(ALL)) + "]")
+			}
+			// need to remove previous name from lc.levelMap to avoid 2+ names refer to the same level number
+			delete(lc.levelMap, strings.Trim(strings.ToLower(lc.levelNames[level]), " "))
+			lc.levelNames[level] = levelName
 		}
-		level := strings.Trim(strings.ToLower(lc.levelNames[i]), " ")
-		if len(level) > 0 {
-			lc.levelMap[level] = Level(i)
+	}
+
+	for i, _ := range lc.levelNames {
+		levelName := strings.Trim(strings.ToLower(lc.levelNames[i]), " ")
+		if len(levelName) > 0 {
+			lc.levelMap[levelName] = Level(i)
 		}
 	}
 }
