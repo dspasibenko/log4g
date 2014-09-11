@@ -1,7 +1,6 @@
-package appenders
+package log4g
 
 import (
-	"github.com/dspasibenko/log4g"
 	. "gopkg.in/check.v1"
 	"time"
 )
@@ -38,12 +37,12 @@ func (s *cAppenderSuite) TestAppend(c *C) {
 	caFactory.out = s
 
 	a, _ := caFactory.NewAppender(map[string]string{"layout": "[%d{15:04:05.000}] %p %c: %m"})
-	appended := a.Append(&log4g.LogEvent{log4g.FATAL, time.Unix(123456, 0), "a.b.c", "Hello Console!"})
+	appended := a.Append(&LogEvent{FATAL, time.Unix(123456, 0), "a.b.c", "Hello Console!"})
 	c.Assert(appended, Equals, true)
 	<-s.signal
-	c.Assert(s.msg, Equals, "[02:17:36.000] FATAL a.b.c: Hello Console!")
+	c.Assert(s.msg, Equals, "[02:17:36.000] FATAL a.b.c: Hello Console!\n")
 
 	caFactory.Shutdown()
-	appended = a.Append(&log4g.LogEvent{log4g.FATAL, time.Unix(0, 0), "a.b.c", "Never delivered"})
+	appended = a.Append(&LogEvent{FATAL, time.Unix(0, 0), "a.b.c", "Never delivered"})
 	c.Assert(appended, Equals, false)
 }

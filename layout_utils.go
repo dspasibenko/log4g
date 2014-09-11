@@ -1,10 +1,9 @@
-package appenders
+package log4g
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/dspasibenko/log4g"
 )
 
 // layout pieces types
@@ -31,7 +30,11 @@ type layoutPiece struct {
 
 type LayoutTemplate []layoutPiece
 
-var logLevelNames []string = log4g.LevelNames()
+var logLevelNames []string
+
+func init() {
+	logLevelNames = lm.config.levelNames
+}
 
 /**
  * Parses log message layout template with the following placeholders:
@@ -92,7 +95,7 @@ func ParseLayout(layout string) (LayoutTemplate, error) {
 	return addPiece(layout[startIdx:len(layout)], lpText, layoutTemplate), nil
 }
 
-func ToLogMessage(logEvent *log4g.LogEvent, template LayoutTemplate) string {
+func ToLogMessage(logEvent *LogEvent, template LayoutTemplate) string {
 	buf := bytes.NewBuffer(make([]byte, 0, 64))
 
 	for _, piece := range template {

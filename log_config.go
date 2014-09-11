@@ -1,6 +1,7 @@
 package log4g
 
 import (
+	"errors"
 	"github.com/dspasibenko/log4g/collections"
 	"strconv"
 	"strings"
@@ -43,7 +44,7 @@ const rootLoggerName = ""
 
 var defaultConfigParams = map[string]string{
 	"appender.ROOT.layout": "[%d{01-02 15:04:05.000}] %p %c: %m",
-	"appender.ROOT.type":   "log4g/appenders/consoleAppender",
+	"appender.ROOT.type":   consoleAppenderName,
 	"context.appenders":    "ROOT",
 	"context.level":        "INFO"}
 
@@ -91,6 +92,18 @@ func (lc *logConfig) initIfNeeded() {
 	lc.setConfigParams(defaultConfigParams)
 }
 
+func (lc *logConfig) cleanUp() {
+	defer EndQuietly()
+
+	for _, ctx := range lc.logContexts.Copy() {
+		ctx.(*logContext).shutdown()
+	}
+
+	for _, app := range lc.appenders {
+		app.Shutdown()
+	}
+}
+
 func (lc *logConfig) initWithParams(oldLogConfig *logConfig, params map[string]string) {
 	for k, v := range oldLogConfig.loggers {
 		lc.loggers[k] = v
@@ -100,6 +113,7 @@ func (lc *logConfig) initWithParams(oldLogConfig *logConfig, params map[string]s
 		lc.appenderFactorys[k] = v
 	}
 
+	lc.levelNames = oldLogConfig.levelNames
 	lc.logLevels, _ = collections.NewSortedSliceByParams(oldLogConfig.logLevels.Copy()...)
 	lc.setConfigParams(params)
 }
@@ -109,14 +123,14 @@ func (lc *logConfig) setConfigParams(params map[string]string) {
 	lc.createAppenders(params)
 	lc.createContexts(params)
 	lc.createLoggers(params)
-	lc.applyLevels()
+	lc.applyLevelsAndContexts()
 }
 
 // Allows to specify custom level names in form level.X=<levelName>
 // for example: level.11=SEVERE
 func (lc *logConfig) applyLevelParams(params map[string]string) {
 	for i, _ := range lc.levelNames {
-		param := cfgLevel + strconv.Itoa(i)
+		param := cfgLevel + "." + strconv.Itoa(i)
 		v, ok := params[param]
 		if ok {
 			lc.levelNames[i] = v
@@ -130,19 +144,19 @@ func (lc *logConfig) applyLevelParams(params map[string]string) {
 
 func (lc *logConfig) createAppenders(params map[string]string) {
 	// collect settings for all appenders from config
-	apps := groupConfigParams(params, cfgAppender)
+	apps := groupConfigParams(params, cfgAppender, isCorrectAppenderName)
 
 	// create appenders
 	for appName, appAttributes := range apps {
 		t := appAttributes[cfgAppenderType]
 		f, ok := lc.appenderFactorys[t]
 		if !ok {
-			panic("No Factory for appender " + t)
+			panic("Cannot construct appender \"" + t + "\" no appender factory is registered for the appender name.")
 		}
 
 		app, err := f.NewAppender(appAttributes)
 		if err != nil {
-			panic(err)
+			panic(err.Error())
 		}
 
 		lc.appenders[appName] = app
@@ -151,22 +165,31 @@ func (lc *logConfig) createAppenders(params map[string]string) {
 
 func (lc *logConfig) createContexts(params map[string]string) {
 	// collect settings for all contexts from config
-	ctxs := groupConfigParams(params, cfgContext)
+	ctxs := groupConfigParams(params, cfgContext, isCorrectLoggerName)
 
 	// create contexts
 	for logName, ctxAttributes := range ctxs {
 		appenders := lc.getAppendersFromList(ctxAttributes[cfgContextAppenders])
 		if len(appenders) == 0 {
-			panic("context " + logName + " doesn't refer at least to one appender")
+			panic("Context \"" + logName + "\" doesn't refer to at least one declared appender.")
 		}
 
-		level := lc.getLevelByName(ctxAttributes[cfgContextLevel])
+		levelName := ctxAttributes[cfgContextLevel]
+		level := INFO
+		if len(levelName) > 0 {
+			level = lc.getLevelByName(levelName)
+			if level < 0 {
+				panic("Unknown log level \"" + levelName + "\" for context \"" + logName + "\"")
+			}
+		}
+
 		bufSizeStr, ok := ctxAttributes[cfgContextBufSize]
 		bufSize := 100
 		if ok {
 			bufSize, err := strconv.Atoi(strings.Trim(bufSizeStr, " "))
 			if err != nil || bufSize < 0 {
-				panic("Incorrect buffer size value for context attribute " + cfgContextBufSize + " should be positive integer")
+				panic("Incorrect buffer size=" + bufSizeStr +
+					" value for context \"" + logName + "\" should be positive integer")
 			}
 		}
 
@@ -188,17 +211,24 @@ func (lc *logConfig) createContexts(params map[string]string) {
 
 func (lc *logConfig) createLoggers(params map[string]string) {
 	// collect settings for all loggers from config
-	loggers := groupConfigParams(params, cfgLogger)
+	loggers := groupConfigParams(params, cfgLogger, isCorrectLoggerName)
 
 	// apply logger settings
 	for loggerName, loggerAttributes := range loggers {
-		level := lc.getLevelByName(loggerAttributes[cfgLoggerLevel])
+		levelName := loggerAttributes[cfgLoggerLevel]
+		level := INFO
+		if len(levelName) > 0 {
+			level = lc.getLevelByName(levelName)
+			if level < 0 {
+				panic("Unknown log level \"" + levelName + "\" for logger \"" + loggerName + "\"")
+			}
+		}
 		setLogLevel(level, loggerName, lc.logLevels)
 		lc.getLogger(loggerName)
 	}
 }
 
-func (lc *logConfig) applyLevels() {
+func (lc *logConfig) applyLevelsAndContexts() {
 	for _, l := range lc.loggers {
 		rootLLS := getLogLevelSetting(l.loggerName, lc.logLevels)
 		l.setLogLevelSetting(rootLLS)
@@ -226,14 +256,31 @@ func (lc *logConfig) setLogLevel(level Level, loggerName string) {
 	applyNewLevelToLoggers(lls, lc.loggers)
 }
 
+func (lc *logConfig) registerAppender(appenderFactory AppenderFactory) error {
+	appenderName := appenderFactory.Name()
+	_, ok := lc.appenderFactorys[appenderName]
+	if ok {
+		return errors.New("Cannot register appender factory for the name " + appenderName +
+			" because the name is already registerd ")
+	}
+
+	lc.appenderFactorys[appenderName] = appenderFactory
+	return nil
+}
+
 func (lc *logConfig) getAppendersFromList(appNames string) []Appender {
+	appNames = strings.Trim(appNames, " ")
+	if len(appNames) == 0 {
+		return nil
+	}
+
 	names := strings.Split(appNames, ",")
 	result := make([]Appender, 0, len(names))
 	for _, name := range names {
 		name = strings.Trim(name, " ")
 		a, ok := lc.appenders[name]
 		if !ok {
-			continue
+			panic("Undefined appender name \"" + name + "\"")
 		}
 		result = append(result, a)
 	}

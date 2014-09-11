@@ -22,8 +22,9 @@ type Logger interface {
 	Info(args ...interface{})
 	Debug(args ...interface{})
 	Trace(args ...interface{})
+	Log(level Level, args ...interface{})
 	Logf(level Level, fstr string, args ...interface{})
-	Log(level Level, payload interface{})
+	Logp(level Level, payload interface{})
 }
 
 type LogEvent struct {
@@ -35,6 +36,7 @@ type LogEvent struct {
 
 type Appender interface {
 	Append(event *LogEvent) bool
+	// should be called every time when the instance is not going to be used anymore
 	Shutdown()
 }
 
@@ -82,9 +84,15 @@ func RegisterAppender(appenderFactory AppenderFactory) error {
  * Reads log4g configuration properties from text file, which name is provided as
  * configFileName parameter.
  */
-func Init(configFileName string) error {
-	//TODO implement it
-	return nil
+func ConfigF(configFileName string) error {
+	return lm.setPropsFromFile(configFileName)
+}
+
+/**
+ * Configures log4g by key:value pairs provided as a map of properties
+ */
+func Config(props map[string]string) error {
+	return lm.setNewProperties(props)
 }
 
 /**
@@ -93,5 +101,5 @@ func Init(configFileName string) error {
  * appenders implementations and close them properly
  */
 func Shutdown() {
-	// TODO: implement it
+	lm.shutdown()
 }

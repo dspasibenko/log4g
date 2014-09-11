@@ -1,14 +1,13 @@
-package appenders
+package log4g
 
 import (
 	"errors"
 	"fmt"
-	"github.com/dspasibenko/log4g"
 	"io"
 	"os"
 )
 
-const consoleAppenderName = "log4g/appenders/consoleAppender"
+const consoleAppenderName = "log4g/consoleAppender"
 
 // Parameters accepted by the appender
 const CAParamLayout = "layout"
@@ -24,9 +23,10 @@ type consoleAppenderFactory struct {
 
 var caFactory *consoleAppenderFactory
 
-func InitConsoleAppender() {
+func init() {
 	caFactory = &consoleAppenderFactory{make(chan string, 1000), os.Stdout}
-	err := log4g.RegisterAppender(caFactory)
+
+	err := RegisterAppender(caFactory)
 	if err != nil {
 		close(caFactory.msgChannel)
 		fmt.Println("It is impossible to register console appender: ", err)
@@ -38,7 +38,7 @@ func InitConsoleAppender() {
 			if !ok {
 				break
 			}
-			fmt.Fprint(caFactory.out, str)
+			fmt.Fprint(caFactory.out, str, "\n")
 		}
 	}()
 }
@@ -47,7 +47,7 @@ func (*consoleAppenderFactory) Name() string {
 	return consoleAppenderName
 }
 
-func (caf *consoleAppenderFactory) NewAppender(params map[string]string) (log4g.Appender, error) {
+func (caf *consoleAppenderFactory) NewAppender(params map[string]string) (Appender, error) {
 	layout, ok := params[CAParamLayout]
 	if !ok || len(layout) == 0 {
 		return nil, errors.New("Cannot create console appender without specified layout")
@@ -55,7 +55,7 @@ func (caf *consoleAppenderFactory) NewAppender(params map[string]string) (log4g.
 
 	layoutTemplate, err := ParseLayout(layout)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Cannot create console appender: " + err.Error())
 	}
 
 	return &consoleAppender{layoutTemplate}, nil
@@ -66,9 +66,9 @@ func (caf *consoleAppenderFactory) Shutdown() {
 }
 
 // Appender interface implementation
-func (cAppender *consoleAppender) Append(event *log4g.LogEvent) (ok bool) {
+func (cAppender *consoleAppender) Append(event *LogEvent) (ok bool) {
 	ok = false
-	defer log4g.EndQuietly()
+	defer EndQuietly()
 	msg := ToLogMessage(event, cAppender.layoutTemplate)
 	caFactory.msgChannel <- msg
 	ok = true
@@ -76,5 +76,5 @@ func (cAppender *consoleAppender) Append(event *log4g.LogEvent) (ok bool) {
 }
 
 func (cAppender *consoleAppender) Shutdown() {
-
+	// Nothing should be done for the console appender
 }

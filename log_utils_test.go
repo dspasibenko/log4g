@@ -54,8 +54,8 @@ func (s *nameUtilsSuite) TestGetConfigParamName(c *C) {
 	c.Assert(ok, Equals, true)
 	c.Assert(ctx, Equals, "")
 
-	ctx, ok = getConfigParamName("appender..test", "appender", isCorrectAppenderName)
-	c.Assert(ok, Equals, false)
+	ok = checkPanic(func() { getConfigParamName("appender..test", "appender", isCorrectAppenderName) })
+	c.Assert(ok, Equals, true)
 
 	ctx, ok = getConfigParamName("context...test", "context", nil)
 	c.Assert(ok, Equals, true)
@@ -81,7 +81,7 @@ func (s *nameUtilsSuite) TestGroupConfigParams(c *C) {
 		"abc":               "def",
 		"context.app.type":  "345",
 		"context.ROOT.ttt":  "qqq",
-	}, "context")
+	}, "context", nil)
 	c.Assert(params["ROOT"]["type"], Equals, "123")
 	c.Assert(params["ROOT"]["ttt"], Equals, "qqq")
 	c.Assert(params["app"]["type"], Equals, "345")
@@ -98,7 +98,7 @@ func (s *nameUtilsSuite) TestCorrectAppenderName(c *C) {
 }
 
 func (s *nameUtilsSuite) TestCorrectLoggerName(c *C) {
-	c.Assert(isCorrectLoggerName(""), Equals, false)
+	c.Assert(isCorrectLoggerName(""), Equals, true)
 	c.Assert(isCorrectLoggerName("a"), Equals, true)
 	c.Assert(isCorrectLoggerName("a1"), Equals, true)
 	c.Assert(isCorrectLoggerName("1a"), Equals, false)
@@ -113,4 +113,12 @@ func (nus *nameUtilsSuite) name() string {
 
 func (nus *nameUtilsSuite) Compare(other collections.Comparator) int {
 	return compare(nus, other.(*nameUtilsSuite))
+}
+
+func checkPanic(f func()) (result bool) {
+	defer func() {
+		result = recover() != nil
+	}()
+	f()
+	return
 }

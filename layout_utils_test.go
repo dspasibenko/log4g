@@ -1,16 +1,12 @@
-package appenders
+package log4g
 
 import (
-	"github.com/dspasibenko/log4g"
 	. "gopkg.in/check.v1"
-	"testing"
 	"time"
 )
 
 type layoutUtilsSuite struct {
 }
-
-func Test(t *testing.T) { TestingT(t) }
 
 var _ = Suite(&layoutUtilsSuite{})
 
@@ -66,6 +62,6 @@ func (s *layoutUtilsSuite) TestParseLayout(c *C) {
 
 func (s *layoutUtilsSuite) TestToLogMessage(c *C) {
 	t, _ := ParseLayout("[%d{01-02 15:04:05.000}] %p %c: %%%m")
-	le := &log4g.LogEvent{log4g.FATAL, time.Unix(123456, 0), "a.b.c", "The Message"}
+	le := &LogEvent{FATAL, time.Unix(123456, 0), "a.b.c", "The Message"}
 	c.Assert(ToLogMessage(le, t), Equals, "[01-02 02:17:36.000] FATAL a.b.c: %The Message")
 }

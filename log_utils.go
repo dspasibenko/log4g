@@ -22,7 +22,7 @@ func compare(n1, n2 logNameProvider) int {
 
 // loggerName cannot start/end from spaces and dots
 func normalizeLogName(name string) string {
-	return strings.ToLower(strings.Trim(name, ". "))
+	return strings.Trim(name, ". ")
 }
 
 /**
@@ -74,7 +74,7 @@ func getConfigParamName(param, prefix string, checker func(string) bool) (string
 
 	paramName := param[start:end]
 	if checker != nil && !checker(paramName) {
-		return "", false
+		panic("Unacceptable param value \"" + paramName + "\" for " + prefix + " setting.")
 	}
 
 	return paramName, true
@@ -91,10 +91,10 @@ func getConfigParamAttribute(param string) string {
 
 // Groups params with the prefix by their names into a map of maps, where the second
 // map defines parameters for the particular key value (param name) from the first map
-func groupConfigParams(params map[string]string, prefix string) map[string]map[string]string {
+func groupConfigParams(params map[string]string, prefix string, checker func(string) bool) map[string]map[string]string {
 	resultMap := make(map[string]map[string]string)
 	for k, v := range params {
-		name, ok := getConfigParamName(k, prefix, nil)
+		name, ok := getConfigParamName(k, prefix, checker)
 		if !ok {
 			continue
 		}
@@ -119,6 +119,9 @@ func isCorrectAppenderName(appenderName string) bool {
 }
 
 func isCorrectLoggerName(loggerName string) bool {
+	if loggerName == "" {
+		return true
+	}
 	matched, err := regexp.MatchString("^[A-Za-z]+([A-Za-z0-9.]*[A-Za-z0-9]+)*$", loggerName)
 	if !matched || err != nil {
 		return false

@@ -13,37 +13,55 @@ type logger struct {
 }
 
 func (l *logger) Fatal(args ...interface{}) {
-	fmt.Println(args)
+	l.Log(FATAL, args...)
 }
 
 func (l *logger) Error(args ...interface{}) {
-
+	l.Log(ERROR, args...)
 }
 
 func (l *logger) Warn(args ...interface{}) {
-
+	l.Log(WARN, args...)
 }
 
 func (l *logger) Info(args ...interface{}) {
-
+	l.Log(INFO, args...)
 }
 
 func (l *logger) Debug(args ...interface{}) {
-
+	l.Log(DEBUG, args...)
 }
 
 func (l *logger) Trace(args ...interface{}) {
-
+	l.Log(TRACE, args...)
 }
 
-func (l *logger) Logf(level Level, fstr string, args ...interface{}) {
-
-}
-
-func (l *logger) Log(level Level, payload interface{}) {
+func (l *logger) Log(level Level, args ...interface{}) {
 	if l.logLevel < level {
 		return
 	}
+	l.logInternal(level, fmt.Sprint(args...))
+}
+
+func (l *logger) Logf(level Level, fstr string, args ...interface{}) {
+	if l.logLevel < level {
+		return
+	}
+	msg := fstr
+	if len(args) > 0 {
+		msg = fmt.Sprintf(fstr, args...)
+	}
+	l.logInternal(level, msg)
+}
+
+func (l *logger) Logp(level Level, payload interface{}) {
+	if l.logLevel < level {
+		return
+	}
+	l.logInternal(level, payload)
+}
+
+func (l *logger) logInternal(level Level, payload interface{}) {
 	l.lctx.log(&LogEvent{level, time.Now(), l.loggerName, payload})
 }
 
