@@ -193,28 +193,19 @@ func (lc *logConfig) createContexts(params map[string]string) {
 			}
 		}
 
-		bufSizeStr, ok := ctxAttributes[cfgContextBufSize]
-		bufSize := 100
-		if ok {
-			bufSize, err := strconv.Atoi(strings.Trim(bufSizeStr, " "))
-			if err != nil || bufSize < 0 {
-				panic("Incorrect buffer size=" + bufSizeStr +
-					" value for context \"" + logName + "\" should be positive integer")
-			}
+		bufSize, err := ParseInt(ctxAttributes[cfgContextBufSize], 0, 100000, 100)
+		if err != nil {
+			panic("Incorrect buffer size=" + ctxAttributes[cfgContextBufSize] +
+				" value for context \"" + logName + "\" should be positive integer: " + err.Error())
 		}
 
-		inhStr, ok := ctxAttributes[cfgContextInherited]
-		inh := true
-		if ok {
-			var err error
-			inh, err = strconv.ParseBool(inhStr)
-			if err != nil {
-				panic("Incorrect context attibute " + cfgContextInherited + " value, should be true or false")
-			}
+		inh, err := ParseBool(ctxAttributes[cfgContextInherited], true)
+		if err != nil {
+			panic("Incorrect context attibute " + cfgContextInherited + " value, should be true or false")
 		}
 
 		setLogLevel(level, logName, lc.logLevels)
-		context, _ := newLogContext(logName, appenders, inh, bufSize)
+		context, _ := newLogContext(logName, appenders, inh, int(bufSize))
 		lc.logContexts.Add(context)
 	}
 }
