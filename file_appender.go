@@ -197,7 +197,6 @@ func (fa *fileAppender) rotateFile() error {
 			fa.stat.size = fInfo.Size()
 		}
 	}
-	fmt.Println("new file ", fa.fileAppend)
 
 	fd, err := os.OpenFile(fa.fileName, flags, 0660)
 	if err != nil {

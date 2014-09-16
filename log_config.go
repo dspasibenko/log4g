@@ -33,6 +33,7 @@ const (
 	cfgContextAppenders = "appenders"
 	cfgContextLevel     = "level"
 	cfgContextBufSize   = "buffer"
+	cfgContextBlocking  = "blocking"
 	cfgContextInherited = "inherited"
 
 	// logger.a.b.c.d.level=INFO
@@ -204,8 +205,13 @@ func (lc *logConfig) createContexts(params map[string]string) {
 			panic("Incorrect context attibute " + cfgContextInherited + " value, should be true or false")
 		}
 
+		blocking, err := ParseBool(ctxAttributes[cfgContextBlocking], true)
+		if err != nil {
+			panic("Incorrect context attibute " + cfgContextBlocking + " value, should be true or false")
+		}
+
 		setLogLevel(level, logName, lc.logLevels)
-		context, _ := newLogContext(logName, appenders, inh, int(bufSize))
+		context, _ := newLogContext(logName, appenders, inh, blocking, int(bufSize))
 		lc.logContexts.Add(context)
 	}
 }

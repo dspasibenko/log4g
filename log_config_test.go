@@ -143,6 +143,8 @@ func (s *logConfigSuite) TestCreateContexts(c *C) {
 		"context.a.b.c.buffer": "-1"})
 	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
 		"context.a.b.c.inherited": "true3"})
+	panicWhenCreateContext(c, lc, map[string]string{"context.a.b.c.appenders": "ROOT",
+		"context.a.b.c.blocking": "true3"})
 	lc.createContexts(nil)
 }
 

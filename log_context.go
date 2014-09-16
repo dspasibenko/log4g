@@ -10,11 +10,12 @@ type logContext struct {
 	loggerName string
 	appenders  []Appender
 	inherited  bool
+	blocking   bool
 	eventsCh   chan *LogEvent
 	controlCh  chan bool
 }
 
-func newLogContext(loggerName string, appenders []Appender, inherited bool, bufSize int) (*logContext, error) {
+func newLogContext(loggerName string, appenders []Appender, inherited, blocking bool, bufSize int) (*logContext, error) {
 	if bufSize <= 0 {
 		return nil, errors.New("Cannot create channel with non-positive size=" + strconv.Itoa(bufSize))
 	}
@@ -25,7 +26,7 @@ func newLogContext(loggerName string, appenders []Appender, inherited bool, bufS
 
 	eventsCh := make(chan *LogEvent, bufSize)
 	controlCh := make(chan bool, 1)
-	lc := &logContext{loggerName, appenders, inherited, eventsCh, controlCh}
+	lc := &logContext{loggerName, appenders, inherited, blocking, eventsCh, controlCh}
 
 	go func() {
 		defer onStop(controlCh)
@@ -54,16 +55,25 @@ func getLogLevelContext(loggerName string, logContexts *collections.SortedSlice)
 	return lProvider.(*logContext)
 }
 
-/**
- * Send the logEvent to all the logContext appenders.
- * Returns true if the logEvent was sent and false if the context is shut down
- */
+// log() function sends the logEvent to all the logContext appenders.
+// It returns true if the logEvent was sent and false if the context is shut down or
+// the context is non-blocking (allows to lost log messages in case of overflow)
 func (lc *logContext) log(le *LogEvent) (result bool) {
 	// Channel can be already closed, so end quietly
 	result = false
 	defer EndQuietly()
-	lc.eventsCh <- le
-	return true
+
+	if lc.blocking {
+		lc.eventsCh <- le
+		return true
+	}
+
+	select {
+	case lc.eventsCh <- le:
+		return true
+	default:
+	}
+	return false
 }
 
 // Called from processing go routine
