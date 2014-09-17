@@ -102,12 +102,122 @@ func (s *faConfigSuite) TestAppendToExistingOne(c *C) {
 	defer removeFiles("____test____log___file")
 	params := map[string]string{"layout": "%p", "fileName": "____test____log___file", "buffer": "1000",
 		"maxFileSize": "2Gib", "maxLines": "2M", "rotate": "none", "append": "true"}
-	writeLogs(c, params, 10000)
 	fa := writeLogs(c, params, 10000)
+	size := fa.stat.size
+	fa = writeLogs(c, params, 10000)
+	c.Check(fa.stat.size, Equals, size*2)
+	c.Check(fa.stat.lines, Equals, int64(20000))
 	c.Check(fa.linesCount(), Equals, int64(20000))
 	params["append"] = "false"
 	fa = writeLogs(c, params, 550)
 	c.Check(fa.linesCount(), Equals, int64(550))
+}
+
+func (s *faConfigSuite) TestSizeRotation(c *C) {
+	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000",
+		"maxFileSize": "2K", "maxLines": "2Mib", "rotate": "daily"})
+	fa := app.(*fileAppender)
+	fa.stat.lines = 0
+	fa.stat.size = 2000
+	c.Assert(fa.sizeRotation(), Equals, false)
+	fa.stat.size++
+	c.Assert(fa.sizeRotation(), Equals, true)
+	fa.stat.size = 0
+	fa.stat.lines = 2 * 1024 * 1024
+	c.Assert(fa.sizeRotation(), Equals, false)
+	fa.stat.lines++
+	c.Assert(fa.sizeRotation(), Equals, true)
+	app.Shutdown()
+}
+
+func (s *faConfigSuite) TestTimeRotation(c *C) {
+	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000",
+		"maxFileSize": "2K", "maxLines": "2Mib", "rotate": "daily"})
+	fa := app.(*fileAppender)
+	fa.stat.startTime = time.Now()
+	c.Assert(fa.timeRotation(), Equals, false)
+
+	fa.stat.startTime = time.Now().AddDate(0, 0, -1)
+	c.Assert(fa.timeRotation(), Equals, true)
+
+	fa.stat.startTime = time.Now().AddDate(0, 0, -7)
+	c.Assert(fa.timeRotation(), Equals, true)
+
+	fa.stat.startTime = time.Now().AddDate(0, 0, 1)
+	c.Assert(fa.timeRotation(), Equals, true)
+	app.Shutdown()
+}
+
+func (s *faConfigSuite) TestisRotationNeededNone(c *C) {
+	defer removeFiles("____test____log___file2")
+	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "____test____log___file2", "buffer": "1000",
+		"maxFileSize": "2K", "maxLines": "2K"})
+	fa := app.(*fileAppender)
+	c.Check(fa.isRotationNeeded(), Equals, true)
+
+	app.Append(&LogEvent{INFO, time.Now(), "abc", "def"})
+	for fa.file == nil {
+		time.Sleep(time.Millisecond)
+	}
+
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.size = 2001
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.lines = 200000
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.startTime = time.Now().AddDate(0, 0, -3)
+	c.Check(fa.isRotationNeeded(), Equals, false)
+
+	app.Shutdown()
+}
+
+func (s *faConfigSuite) TestisRotationNeededSize(c *C) {
+	defer removeFiles("____test____log___file2")
+	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "____test____log___file2", "buffer": "1000",
+		"maxFileSize": "2K", "maxLines": "2K", "rotate": "size"})
+	fa := app.(*fileAppender)
+	c.Check(fa.isRotationNeeded(), Equals, true)
+
+	app.Append(&LogEvent{INFO, time.Now(), "abc", "def"})
+	for fa.file == nil {
+		time.Sleep(time.Millisecond)
+	}
+
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.startTime = time.Now().AddDate(0, 0, -3)
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.size = 2001
+	c.Check(fa.isRotationNeeded(), Equals, true)
+	fa.stat.size = 0
+	fa.stat.lines = 200000
+	c.Check(fa.isRotationNeeded(), Equals, true)
+
+	app.Shutdown()
+}
+
+func (s *faConfigSuite) TestisRotationNeededDaily(c *C) {
+	defer removeFiles("____test____log___file2")
+	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "____test____log___file2", "buffer": "1000",
+		"maxFileSize": "2K", "maxLines": "2K", "rotate": "daily"})
+	fa := app.(*fileAppender)
+	c.Check(fa.isRotationNeeded(), Equals, true)
+
+	app.Append(&LogEvent{INFO, time.Now(), "abc", "def"})
+	for fa.file == nil {
+		time.Sleep(time.Millisecond)
+	}
+
+	c.Check(fa.isRotationNeeded(), Equals, false)
+	fa.stat.startTime = time.Now().AddDate(0, 0, -3)
+	c.Check(fa.isRotationNeeded(), Equals, true)
+	fa.stat.startTime = time.Now()
+	fa.stat.size = 2001
+	c.Check(fa.isRotationNeeded(), Equals, true)
+	fa.stat.size = 0
+	fa.stat.lines = 200000
+	c.Check(fa.isRotationNeeded(), Equals, true)
+
+	app.Shutdown()
 }
 
 func removeFiles(prefix string) {
