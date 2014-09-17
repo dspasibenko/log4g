@@ -1,9 +1,11 @@
 package log4g
 
 import (
-	"filepath"
 	. "gopkg.in/check.v1"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -98,7 +100,7 @@ func (s *faConfigSuite) TestAppendAndCountLines(c *C) {
 
 func (s *faConfigSuite) TestAppendToExistingOne(c *C) {
 	defer removeFiles("____test____log___file")
-	params := map[string]string{"layout": "%p", "____test____log___file": "logFile", "buffer": "1000",
+	params := map[string]string{"layout": "%p", "fileName": "____test____log___file", "buffer": "1000",
 		"maxFileSize": "2Gib", "maxLines": "2M", "rotate": "none", "append": "true"}
 	writeLogs(c, params, 10000)
 	fa := writeLogs(c, params, 10000)
@@ -112,7 +114,7 @@ func removeFiles(prefix string) {
 	archiveName, _ := filepath.Abs(prefix)
 	dir := filepath.Dir(archiveName)
 	baseName := filepath.Base(archiveName)
-	fileInfos, err := ioutil.ReadDir(dir)
+	fileInfos, _ := ioutil.ReadDir(dir)
 	for _, fInfo := range fileInfos {
 		if fInfo.IsDir() || !strings.HasPrefix(fInfo.Name(), baseName) {
 			continue
