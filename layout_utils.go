@@ -36,15 +36,22 @@ func init() {
 	logLevelNames = lm.config.levelNames
 }
 
-/**
- * Parses log message layout template with the following placeholders:
- * %c - logger name
- * %d{date/time format} - date/time. The date/time format should be specified
- *				in time.Format() form like "Mon, 02 Jan 2006 15:04:05 -0700"
- * %p - priority name
- * %m - the log message
- * %% - '%'
- */
+// ParseLayout parses the layout parameter and returns LayoutTemplate instance
+// if it is correct.
+// The log message layout is format string with the following placeholders:
+// %c - logger name
+// %d{date/time format} - date/time. The date/time format should be specified
+//				in time.Format() form like "Mon, 02 Jan 2006 15:04:05 -0700"
+// %p - priority name
+// %m - the log message
+// %% - '%'
+//
+// For example, layout string '[%d{01-02 15:04:05.000}] %p %c: %m' will be parsed
+// to a layout template, which can be used by ToLogMessage() to form the log
+// line. For logger 'a.b.c' will produce message like this:
+//
+// [09-17 12:34:12.123] INFO a.b.c: Hello logging world!
+//
 func ParseLayout(layout string) (LayoutTemplate, error) {
 	layoutTemplate := make(LayoutTemplate, 0, 10)
 	state := psText
@@ -95,6 +102,15 @@ func ParseLayout(layout string) (LayoutTemplate, error) {
 	return addPiece(layout[startIdx:len(layout)], lpText, layoutTemplate), nil
 }
 
+// ToLogMessage transforms logEvent value to a log text line using provided
+// layout template.
+//
+// For example, for the template '[%d{01-02 15:04:05.000}] %p %c: %m'
+// the code line 'abcLogger.info("Hello logging world!")' will produce the log message:
+//
+// [09-17 12:34:12.123] INFO a.b.c: Hello logging world!
+//
+// for the logger 'a.b.c'
 func ToLogMessage(logEvent *LogEvent, template LayoutTemplate) string {
 	buf := bytes.NewBuffer(make([]byte, 0, 64))
 

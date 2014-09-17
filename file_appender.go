@@ -81,8 +81,11 @@ type stats struct {
 	lastErrorTime time.Time
 }
 
+var faFactory *fileAppenderFactory
+
 func init() {
-	RegisterAppender(&fileAppenderFactory{})
+	faFactory = &fileAppenderFactory{}
+	RegisterAppender(faFactory)
 }
 
 // The factory allows to create an appender instances
@@ -149,6 +152,7 @@ func (faf *fileAppenderFactory) NewAppender(params map[string]string) (Appender,
 
 	go func() {
 		defer app.close()
+		app.stat.startTime = time.Now()
 		for {
 			str, ok := <-app.msgChannel
 			if !ok {
@@ -222,13 +226,16 @@ func (fa *fileAppender) linesCount() int64 {
 }
 
 func (fa *fileAppender) archiveCurrent() {
-	if fa.file == nil {
+	// if there is no file, or it is the first visit of the method for the appender
+	// and we would like to continue write to the same file...
+	finfo, err := os.Stat(fa.fileName)
+	if err != nil || (fa.file == nil && fa.fileAppend) {
 		return
 	}
 
 	archiveName, _ := filepath.Abs(fa.fileName)
 	if fa.rotate == rsDaily {
-		archiveName += "." + fa.stat.startTime.Format("2006-01-02")
+		archiveName += "." + finfo.ModTime().Format("2006-01-02")
 	}
 
 	dir := filepath.Dir(archiveName)
@@ -254,8 +261,10 @@ func (fa *fileAppender) archiveCurrent() {
 			id = fId + 1
 		}
 	}
-	fa.file.Close()
-	fa.file = nil
+	if fa.file != nil {
+		fa.file.Close()
+		fa.file = nil
+	}
 	archiveName = archiveName + "." + strconv.Itoa(id)
 	err = os.Rename(fa.fileName, archiveName)
 	if err != nil {
@@ -268,14 +277,22 @@ func (fa *fileAppender) isRotationNeeded() bool {
 		return true
 	}
 
-	if fa.stat.size > fa.maxSize || fa.stat.lines > fa.maxLines {
-		return true
-	}
-
-	if fa.rotate != rsDaily {
+	switch fa.rotate {
+	case rsNone:
 		return false
+	case rsSize:
+		return fa.sizeRotation()
+	case rsDaily:
+		return fa.sizeRotation() || fa.timeRotation()
 	}
+	return false
+}
 
+func (fa *fileAppender) sizeRotation() bool {
+	return fa.stat.size > fa.maxSize || fa.stat.lines > fa.maxLines
+}
+
+func (fa *fileAppender) timeRotation() bool {
 	now := time.Now()
 	return fa.stat.startTime.Day() != now.Day() || now.Sub(fa.stat.startTime) > time.Hour*24
 }

@@ -9,7 +9,8 @@ import (
 
 const consoleAppenderName = "log4g/consoleAppender"
 
-// layout - appender setting to specify format of the log event to message transformation
+// layout - appender setting to specify format of the log event to message
+// transformation
 const CAParamLayout = "layout"
 
 type consoleAppender struct {
