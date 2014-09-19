@@ -97,3 +97,11 @@ func (lm *logManager) setNewProperties(props map[string]string) (err error) {
 	oldConfig.cleanUp()
 	return
 }
+
+func (lm *logManager) setLogLevelName(level int, name string) bool {
+	if level < 0 || level >= len(lm.config.levelNames) {
+		return false
+	}
+	lm.config.levelNames[level] = name
+	return true
+}

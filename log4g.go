@@ -61,6 +61,15 @@ type AppenderFactory interface {
 	Shutdown()
 }
 
+// SetLogLevelName allows to associate level with its name. All messages with
+// the level, which have been emitted after this settings, will appear with the
+// provided name.
+// returns false if the level is out of the acceptable range, or true if the
+// name is applied.
+func SetLogLevelName(level Level, name string) bool {
+	return lm.setLogLevelName(int(level), name)
+}
+
 // GetLogger returns pointer to the Logger object for specified logger name.
 // The function will always return the same pointer for the same logger's name
 // regardless of log4g configuration or other settings
