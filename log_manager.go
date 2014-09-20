@@ -61,7 +61,7 @@ func (lm *logManager) setPropsFromFile(configFileName string) error {
 	lineNum := 1
 	for ; scanner.Scan(); lineNum++ {
 		line := strings.TrimLeft(scanner.Text(), " ")
-		if len(line) == 0 || strings.HasPrefix(line, "#") {
+		if len(line) == 0 || strings.Index(line, "#")) == 0 {
 			continue
 		}
 

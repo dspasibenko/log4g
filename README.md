@@ -1,5 +1,20 @@
-# Log4g Logging Library
-Log4g is an open source project which intends to bring fast, flexible and scalable logging solution to the Go world. It allows the developer to control which log statements are output with arbitrary granularity. It is fully configurable at runtime using external configuration files. Among other logging approaches log4g borrows some cool stuff from log4j library, but it doesn't try to repeat the library architecture, even many things look pretty similar (including the name of the project with one letter different only)
+# Log4g - Go (golang) Logging Library
+Log4g is an open source project which intends to bring fast, flexible and scalable logging solution to the Golang world. It allows the developer to control which log statements are output with arbitrary granularity. It is fully configurable at runtime using external configuration files. Among other logging approaches log4g borrows some cool stuff from log4j library, but it doesn't try to repeat the library architecture, even many things look pretty similar (including the name of the project with one letter different only)
+
+## Quick start
+To start work with log4g you have to import log4g package, get a logger and start to use it. log4g will use default configuration if no configuration is provided:
+
+```
+import "github.com/dspasibenko/log4g"
+unc main() {
+	helloLogger := log4g.GetLogger("Hello")
+	helloLogger.Info("Hello ", "GoLang World")
+	defer log4g.Shutdown()
+}
+
+```
+
+log4g uses concurrent logging message processing with active usage of go routines. In addition some internal components, like plugable appenders, may require strong initialization - finalization lifecycle. To avoid data loss, finalize, and free  resources properly the `log4g.Shutdown()` function should be called. It can be called just before your application is over, otherwise you probably will not have a chance to see some of your logging messages. 
 
 ## Architecture
 log4g operates with the following terms and components: _log level_,  _logger_, _log event_, _logger name_, _logger context_, _appender_, and _log4g configuration_. 
@@ -73,16 +88,112 @@ Any logging message, submitted to log4g via `Logger`, is checked against _Log Le
 ### Logger Context
 _Logger Context_ is an internal component which allows to aggregate logging messages from different _loggers_ and distribute them between _Appenders_ associated with the _Logger Context_. 
 
-There is no special functions to configure _Logger Contexts_, so users can specify their configurations via log4g configuration calls. 
+There is no special functions to configure _Logger Contexts_, so users can specify their configurations via log4g configuration functions calls. 
 
-Every _Logger_ is associated with one _Logger Context_, but one _Logger Context_ can be associated with multiple _Loggers_. This association is done by same manner how _Log Level Settings_ are applied to _Loggers_: every _Logger Context_ has a "Logger Name" associated with it. So as every _Logger_ is always associated with its "Logger Name" the _Logger Context_ is associated with the _Logger_ if its logger name is closed ancestor for the logger name. 
+Every _Logger_ is associated with one _Logger Context_, but one _Logger Context_ can be associated with multiple _Loggers_. This association is done by same manner how _Log Level Settings_ are applied to _Loggers_: every _Logger Context_ and _Logger_ are named objects, so they "Logger Names" associated with them. _Logger Context_ is associated with a _Logger_ if its logger name is closed ancestor for the _Logger_ name. 
 
 log4g always has _Logger Context_ associated with _root logger name_, so every _Logger_ will always be associated with at least this _root Logger Context_.
 
 ### Appender
+log4g allows configurations when logging message will be sent to multiple destinations. The component which is plugged to log4g and implements a destination specific is called _Appender_. From log4g perspective every _appender_ implements `log4g.Appender` interface. Different _appenders_ can have different configurations based on the implementation specific. An _appender_ can be associated with multiple _Logger Contexts_ to have an ability to receive logging messages from different _loggers_.
+
+_Appender_ is uniquely named structure, it means at a moment of time there could be only one appender instance with a certain name. Every _appender_ belongs to a specific appender type, which is identified by name. log4g allows to have many _appenders_ with the same type configured. In default configuration there are 2 types of appenders allowed - `log4g/consoleAppender` and `log4g/fileAppender`. Users can implement their own _appenders_ for a destination specific, register them in log4g, and make LogEvents be sent to them by providing appropriate configuration.
 
 ### Log4g Configuration
+log4g initialized in default configuration, so to start to use developers just can receive a _logger_ and starts to send messages into it:
 
+```
+        log4g.GetLogger("Hello").Info("Hello ", "GoLang logging world!")
+        ...
+        log4g.Shutdown()
+```
+
+what should cause the output like this into the console:
+
+```
+[09-19 10:03:53.487] INFO  Hello: Hello GoLang logging world!
+```
+but the console could be not only place where the logging messages should come to, so users have an ability to provide configuration as a `map[string]string` object representing a set of _<key: value>_ configuration pairs:
+
+```
+    func Config(props map[string]string) error
+```
+
+Another function allows to read configuration from file:
+
+```
+    func ConfigF(configFileName string) error
+```
+
+Both of this functions can be called multiple times in the program run-time, what will cause of re-configuring log4g in case of correct configuration is provided.
+
+log4g configuration is provided like a set of _<key:value>_ pairs. The set of pairs can be specified in `map[string]string` object or by a property file. The property file is a text file with the following agreements:
+* The _<key:value>_ pair is specified in one line as <key>=<value> form
+* empty lines are ignored
+* lines with first `#` symbol are considered like comments
+
+Every configuration key has _<object>.<name>.<object param>_ format. For example `context.FileSystem.ntfs.buffer` key has:
+* <object> == context
+* <name> == FileSystem.ntfs
+* <object param> == buffer
+
+The following types of objects are supported:
+* **level**
+* **appender**
+* **context**
+* **logger**
+
+#### level configuration
+The **level** object can be configured like:
+
+```
+level.12=SEVERE
+```
+
+which allows to associate _logger level_ with its name. The _object param_ is an integer in the rang [0..70], no restrictions on its value is applied.
+
+#### appender configuration
+The **appender** object can be configured like:
+
+```
+appender.root.type=log4g/consoleAppender
+appender.file.type=log4g/fileAppender
+```
+
+This configuration defines 2 appenders with names "root" and "file" respectively. For both appenders "type" argument is specified. 
+
+There are 2 appenders come with log4g: console and file appenders. For both of them **layout** parameter must be defined. The appender **layout** value defines the output format of logging message. The **layout** value is a text with placeholders as follows:
+*  **%c** - logger name
+*  **%d{date/time format}** - date/time. The date/time format should be specified in time.Format() form like "Mon, 02 Jan 2006 15:04:05 -0700" etc.
+* **%p** - log level name
+* **%m** - the logging message text 
+* **%%** - `%` symbol
+
+#### context configuration
+The **context** object can be configured like:
+
+```
+context.buffer=100
+context.FileSystem.ntfs.appenders=root,file
+```
+
+First **context** has empty _<name>_ which means that the context is applied for _root logger name_. Second context specified for "FileSystem.ntfs" logger name.
+
+#### logger configuration
+The **logger** object can be configured like:
+
+```
+logger.level=INFO
+logger.FileSystem.ntfs.level=DEBUG
+```
+
+Like for **context** object the _<name>_ field specifies the logger name. First line sets log level to INFO for _root logger name_. Second line set DEBUG level for "FileSystem.ntfs" logger name.
+
+All supported values are defined in the following example:
+
+
+## Implementing Appenders
+TBD.
 
 
 
