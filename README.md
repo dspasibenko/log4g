@@ -51,7 +51,7 @@ _Logger names_ are case-sensitive and they follow the hierarchical naming rule: 
 For example, the _Logger names_ `FileSystem` is a parent of the `FileSystem.ntfs`. Similarly, `a.b` is a parent of `a.b.c` and an ancestor of `a.b.c.d`. This naming scheme should be familiar to most developers and especially log4j users.
 
 ### Log Level Settings
-log4g log level filtering configuration consists of list of pairs *<logger name : maximum allowed log level>*. Hierarchical relations of logger names allow to build flexible and advanced filtering configurations.
+log4g log level filtering configuration consists of list of pairs *{logger name : maximum allowed log level}*. Hierarchical relations of logger names allow to build flexible and advanced filtering configurations.
 
 Adding or changing value in the list can be done by calling `SetLogLevel()` function declared in log4g package:
 
@@ -113,7 +113,7 @@ what should cause the output like this into the console:
 ```
 [09-19 10:03:53.487] INFO  Hello: Hello GoLang logging world!
 ```
-but the console could be not only place where the logging messages should come to, so users have an ability to provide configuration as a `map[string]string` object representing a set of _<key: value>_ configuration pairs:
+but the console could be not only place where the logging messages should come to, so users have an ability to provide configuration as a `map[string]string` object representing a set of _{key: value}_ configuration pairs:
 
 ```
     func Config(props map[string]string) error
@@ -127,15 +127,15 @@ Another function allows to read configuration from file:
 
 Both of this functions can be called multiple times in the program run-time, what will cause of re-configuring log4g in case of correct configuration is provided.
 
-log4g configuration is provided like a set of _<key:value>_ pairs. The set of pairs can be specified in `map[string]string` object or by a property file. The property file is a text file with the following agreements:
-* The _<key:value>_ pair is specified in one line as <key>=<value> form
+log4g configuration is provided like a set of _{key:value}_ pairs. The set of pairs can be specified in `map[string]string` object or by a property file. The property file is a text file with the following agreements:
+* The _{key:value}_ pair is specified in one line as <key>=<value> form
 * empty lines are ignored
 * lines with first `#` symbol are considered like comments
 
-Every configuration key has _<object>.<name>.<object param>_ format. For example `context.FileSystem.ntfs.buffer` key has:
-* <object> == context
-* <name> == FileSystem.ntfs
-* <object param> == buffer
+Every configuration key has _{object}.{name}.{object param}_ format. For example `context.FileSystem.ntfs.buffer` key has:
+* {object} == context
+* {name} == FileSystem.ntfs
+* {object param} == buffer
 
 The following types of objects are supported:
 * **level**
@@ -177,7 +177,7 @@ context.buffer=100
 context.FileSystem.ntfs.appenders=root,file
 ```
 
-First **context** has empty _<name>_ which means that the context is applied for _root logger name_. Second context specified for "FileSystem.ntfs" logger name.
+First **context** has empty _{name}_ which means that the context is applied for _root logger name_. Second context specified for "FileSystem.ntfs" logger name.
 
 #### logger configuration
 The **logger** object can be configured like:
@@ -187,7 +187,7 @@ logger.level=INFO
 logger.FileSystem.ntfs.level=DEBUG
 ```
 
-Like for **context** object the _<name>_ field specifies the logger name. First line sets log level to INFO for _root logger name_. Second line sets DEBUG level for "FileSystem.ntfs" logger name.
+Like for **context** object the _{name}_ field specifies the logger name. First line sets log level to INFO for _root logger name_. Second line sets DEBUG level for "FileSystem.ntfs" logger name.
 
 All supported parameters listed in the following example:
 
