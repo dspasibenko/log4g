@@ -2,7 +2,7 @@
 Log4g is an open source project which intends to bring fast, flexible and scalable logging solution to the Golang world. It allows the developer to control which log statements are output with arbitrary granularity. It is fully configurable at runtime using external configuration files. Among other logging approaches log4g borrows some cool stuff from log4j library, but it doesn't try to repeat the library architecture, even many things look pretty similar (including the name of the project with one letter different only)
 
 ## Quick start
-To start work with log4g you have to import log4g package, get a logger and start to use it. log4g will use default configuration if no configuration is provided:
+To start working with log4g you have to import log4g package, get a `Logger` instance and start to use it. log4g will use default configuration if no configuration is provided:
 
 ```
 import "github.com/dspasibenko/log4g"
@@ -14,7 +14,7 @@ unc main() {
 
 ```
 
-log4g uses concurrent logging message processing with active usage of go routines. In addition some internal components, like plugable appenders, may require strong initialization - finalization lifecycle. To avoid data loss, finalize, and free  resources properly the `log4g.Shutdown()` function should be called. It can be called just before your application is over, otherwise you probably will not have a chance to see some of your logging messages. 
+log4g uses concurrent logging messages processing with active usage of go routines. In addition, some internal components, like plugable appenders, may require strong initialization - finalization lifecycle. To avoid data loss, finalize, and free  resources properly the `log4g.Shutdown()` function should be called. It can be called just before your application is over, otherwise you probably will not have a chance to see some of your logging messages. 
 
 ## Architecture
 log4g operates with the following terms and components: _log level_,  _logger_, _log event_, _logger name_, _logger context_, _appender_, and _log4g configuration_. 
@@ -160,9 +160,9 @@ appender.root.type=log4g/consoleAppender
 appender.file.type=log4g/fileAppender
 ```
 
-This configuration defines 2 appenders with names "root" and "file" respectively. For both appenders "type" argument is specified. 
+This configuration defines 2 appenders with names "root" and "file" respectively. For both appenders "type" parameter is specified. 
 
-There are 2 appenders come with log4g: console and file appenders. For both of them **layout** parameter must be defined. The appender **layout** value defines the output format of logging message. The **layout** value is a text with placeholders as follows:
+There are 2 appenders which come with log4g: console and file appenders. For both of them **layout** parameter must be defined. The appender **layout** value defines the output format of logging message. The **layout** value is a text with placeholders as follows:
 *  **%c** - logger name
 *  **%d{date/time format}** - date/time. The date/time format should be specified in time.Format() form like "Mon, 02 Jan 2006 15:04:05 -0700" etc.
 * **%p** - log level name
@@ -187,10 +187,64 @@ logger.level=INFO
 logger.FileSystem.ntfs.level=DEBUG
 ```
 
-Like for **context** object the _<name>_ field specifies the logger name. First line sets log level to INFO for _root logger name_. Second line set DEBUG level for "FileSystem.ntfs" logger name.
+Like for **context** object the _<name>_ field specifies the logger name. First line sets log level to INFO for _root logger name_. Second line sets DEBUG level for "FileSystem.ntfs" logger name.
 
-All supported values are defined in the following example:
+All supported parameters listed in the following example:
 
+```
+# Associate log levels with their names
+level.10=FATAL
+level.11=SEVERE
+
+# Console appender
+appender.console.type=log4g/consoleAppender
+appender.console.layout=%p %m 
+
+# File appender
+appender.file.type=log4g/fileAppender
+appender.file.layout=[%d{01-02 15:04:05.000}] %p %c: %m 
+appender.file.fileName=console.log
+
+# append parameter defines whether new messages will be added 
+# to the log file, or previous context will be lost
+appender.file.append=false
+
+# maxFileSize limits the maximum file size (see rotate parameter). 
+# The value can be specified as human-readable form 10M, 2Gib etc.
+appender.file.maxFileSize=20000
+
+# maxLines limits maximum number of lines written to the file 
+appender.file.maxLines=2000
+
+# rotate defines file rotation policy: 
+# "none" - no rotation happens, the log file will grow with no limits
+# "size" - logging message will be written to new file, 
+#          if file size or number of lines exceeds maximum values
+# "daily" - same like "size" + new file is created on daily basis
+#          even if limits are not reached.
+appender.file.rotate=daily 
+
+# Logger Context for root logger name
+context.appenders=console
+
+# buffer specifies the size of channel (Log events) between loggers and appenders
+context.buffer=100
+
+# blocking specifies the context behaviour in case of the event channel is full.
+# if it is true (default value) then the logger call will be blocked 
+# until it can put log event to the channel.
+# if it is false, logger is never blocked, but the log event will be lost if the channel is full.
+context.blocking=false
+
+# level specifies log level for the context log name (root in this case)
+context.level=DEBUG
+
+# this context defined for "a.b" logger name will send log events to 2 appenders
+context.a.b.appenders=console,file 
+
+# level - specifies log level for the logger name "a.b.c.d"
+logger.a.b.c.d.level=TRACE
+```
 
 ## Implementing Appenders
 TBD.
