@@ -69,8 +69,10 @@ func (ss *SortedSlice) Delete(val Comparator) bool {
 	return true
 }
 
-func (ss *SortedSlice) DeleteAt(idx int) {
+func (ss *SortedSlice) DeleteAt(idx int) Comparator {
+	result := ss.data[idx]
 	ss.data = append(ss.data[:idx], ss.data[idx+1:]...)
+	return result
 }
 
 func (ss *SortedSlice) Copy() []Comparator {

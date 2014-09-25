@@ -48,17 +48,22 @@ func (s *faConfigSuite) TestNewAppender(c *C) {
 	c.Assert(err, NotNil)
 
 	app, err = faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000", "append": "true",
-		"maxFileSize": "2K", "maxLines": "10"})
+		"maxFileSize": "2K", "maxDiskSpace": "10"})
 	c.Assert(app, IsNil)
 	c.Assert(err, NotNil)
 
 	app, err = faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000", "append": "true",
-		"maxFileSize": "2K", "maxLines": "2G", "rotate": "daily2"})
+		"maxFileSize": "2K", "maxDiskSpace": "2G", "rotate": "daily2"})
 	c.Assert(app, IsNil)
 	c.Assert(err, NotNil)
 
 	app, err = faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000", "append": "true",
-		"maxFileSize": "2K", "maxLines": "2M", "rotate": "size"})
+		"maxFileSize": "2K", "maxDiskSpace": "2K", "rotate": "daily"})
+	c.Assert(app, IsNil)
+	c.Assert(err, NotNil)
+
+	app, err = faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000", "append": "true",
+		"maxFileSize": "2K", "maxDiskSpace": "2M", "rotate": "size"})
 	c.Assert(app, NotNil)
 	c.Assert(err, IsNil)
 	c.Assert(app.(*fileAppender).rotate, Equals, rsSize)
@@ -67,7 +72,7 @@ func (s *faConfigSuite) TestNewAppender(c *C) {
 
 func (s *faConfigSuite) TestShutdown(c *C) {
 	app, err := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000",
-		"maxFileSize": "2K", "maxLines": "2M", "rotate": "daily"})
+		"maxFileSize": "2K", "maxDiskSpace": "2M", "rotate": "daily"})
 	c.Assert(app, NotNil)
 	c.Assert(err, IsNil)
 	fa := app.(*fileAppender)
@@ -75,7 +80,7 @@ func (s *faConfigSuite) TestShutdown(c *C) {
 	c.Assert(fa.fileAppend, Equals, true)
 	c.Assert(fa.fileName, Equals, "fn")
 	c.Assert(fa.maxSize, Equals, int64(2000))
-	c.Assert(fa.maxLines, Equals, int64(2000000))
+	c.Assert(fa.maxDiskSpace, Equals, int64(2000000))
 	c.Assert(fa.rotate, Equals, rsDaily)
 	ok := false
 	select {
@@ -91,41 +96,33 @@ func (s *faConfigSuite) TestShutdown(c *C) {
 	c.Assert(ok, Equals, false)
 }
 
-func (s *faConfigSuite) TestAppendAndCountLines(c *C) {
-	defer os.Remove("fn")
-	fa := writeLogs(c, map[string]string{"layout": "%p", "fileName": "fn", "buffer": "1000",
-		"maxFileSize": "2Gib", "maxLines": "2M", "rotate": "daily"}, 10000)
-	c.Check(fa.linesCount(), Equals, int64(10000))
+func (s *faConfigSuite) TestAppendDiskSpace(c *C) {
+	defer removeFiles("456____test____log___file")
+	fa := writeLogs(c, map[string]string{"layout": "%p", "fileName": "456____test____log___file", "buffer": "1000",
+		"maxFileSize": "1K", "maxDiskSpace": "10K", "rotate": "size"}, 5000)
+	c.Check(fa.stat.chunksSize >= 9000 && fa.stat.chunksSize <= 10000, Equals, true)
 }
 
 func (s *faConfigSuite) TestAppendToExistingOne(c *C) {
 	defer removeFiles("____test____log___file")
 	params := map[string]string{"layout": "%p", "fileName": "____test____log___file", "buffer": "1000",
-		"maxFileSize": "2Gib", "maxLines": "2M", "rotate": "none", "append": "true"}
+		"maxFileSize": "2Gib", "rotate": "none", "append": "true"}
 	fa := writeLogs(c, params, 10000)
 	size := fa.stat.size
 	fa = writeLogs(c, params, 10000)
 	c.Check(fa.stat.size, Equals, size*2)
-	c.Check(fa.stat.lines, Equals, int64(20000))
-	c.Check(fa.linesCount(), Equals, int64(20000))
 	params["append"] = "false"
-	fa = writeLogs(c, params, 550)
-	c.Check(fa.linesCount(), Equals, int64(550))
+	fa = writeLogs(c, params, 10000)
+	c.Check(fa.stat.size, Equals, size)
 }
 
 func (s *faConfigSuite) TestSizeRotation(c *C) {
 	app, _ := faFactory.NewAppender(map[string]string{"layout": " %p", "fileName": "fn", "buffer": "1000",
-		"maxFileSize": "2K", "maxLines": "2Mib", "rotate": "daily"})
+		"maxFileSize": "2K", "masDiskSpace": "10K", "rotate": "daily"})
 	fa := app.(*fileAppender)
-	fa.stat.lines = 0
 	fa.stat.size = 2000
 	c.Assert(fa.sizeRotation(), Equals, false)
 	fa.stat.size++
-	c.Assert(fa.sizeRotation(), Equals, true)
-	fa.stat.size = 0
-	fa.stat.lines = 2 * 1024 * 1024
-	c.Assert(fa.sizeRotation(), Equals, false)
-	fa.stat.lines++
 	c.Assert(fa.sizeRotation(), Equals, true)
 	app.Shutdown()
 }
@@ -163,8 +160,6 @@ func (s *faConfigSuite) TestisRotationNeededNone(c *C) {
 	c.Check(fa.isRotationNeeded(), Equals, false)
 	fa.stat.size = 2001
 	c.Check(fa.isRotationNeeded(), Equals, false)
-	fa.stat.lines = 200000
-	c.Check(fa.isRotationNeeded(), Equals, false)
 	fa.stat.startTime = time.Now().AddDate(0, 0, -3)
 	c.Check(fa.isRotationNeeded(), Equals, false)
 
@@ -188,9 +183,6 @@ func (s *faConfigSuite) TestisRotationNeededSize(c *C) {
 	c.Check(fa.isRotationNeeded(), Equals, false)
 	fa.stat.size = 2001
 	c.Check(fa.isRotationNeeded(), Equals, true)
-	fa.stat.size = 0
-	fa.stat.lines = 200000
-	c.Check(fa.isRotationNeeded(), Equals, true)
 
 	app.Shutdown()
 }
@@ -213,10 +205,6 @@ func (s *faConfigSuite) TestisRotationNeededDaily(c *C) {
 	fa.stat.startTime = time.Now()
 	fa.stat.size = 2001
 	c.Check(fa.isRotationNeeded(), Equals, true)
-	fa.stat.size = 0
-	fa.stat.lines = 200000
-	c.Check(fa.isRotationNeeded(), Equals, true)
-
 	app.Shutdown()
 }
 

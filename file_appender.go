@@ -1,12 +1,13 @@
 package log4g
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
+	"github.com/dspasibenko/log4g/collections"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -33,14 +34,17 @@ const FAParamFileAppend = "append"
 const FAParamFileBuffer = "buffer"
 
 // maxFileSize - appender settings which limits the size of the file chunk. The size can be specified in
-// human readable form like 10Mb or 1000kiB etc. 1024 <= maxFileSize <= maxInt64
-// this parameter is OPTIONAL, default value is maxInt64. It is ignored if rotate != maxSize
+// human readable form like 10Mb or 1000kiB etc. 1000 <= maxFileSize <= maxInt64,
+// but should be less at than maxDiskSpace/2 if rotate != none!
+// this parameter is OPTIONAL, default value is maxInt64. It is ignored if rotate == none
 const FAParamMaxSize = "maxFileSize"
 
-// maxLines - appender settings which limits the number of lines in a file chunk. The number can be specified in
-// human readable form like 10Mb or 400kB etc. 1000 <= maxFileSize <= maxInt64
-// this parameter is OPTIONAL, default value is maxInt64. It is ignored if rotate != maxLines
-const FAParamMaxLines = "maxLines"
+// maxDiskSpace - appender settings which limits the total disk space required
+// for all log chunks. The number can be specified in human readable form like
+// 10Mb or 400kB etc. 2000 <= maxDiskSpace <= maxInt64
+// this parameter is OPTIONAL, default value is maxInt64. It is ignored if
+// rotate == none.
+const FAParamMaxDiskSpace = "maxDiskSpace"
 
 // rotate - defines file-chunks rotation policy.
 // this parameter is OPTIONAL, default value is none.
@@ -69,16 +73,28 @@ type fileAppender struct {
 	layoutTemplate LayoutTemplate
 	fileAppend     bool
 	maxSize        int64
-	maxLines       int64
+	maxDiskSpace   int64
 	rotate         int
 	stat           stats
 }
 
 type stats struct {
-	lines         int64
+	chunks     *collections.SortedSlice
+	chunksSize int64
+
 	size          int64
 	startTime     time.Time
 	lastErrorTime time.Time
+}
+
+type chunkInfo struct {
+	id   int
+	name string
+	size int64
+}
+
+func (ci *chunkInfo) Compare(other collections.Comparator) int {
+	return ci.id - other.(*chunkInfo).id
 }
 
 var faFactory *fileAppenderFactory
@@ -124,9 +140,9 @@ func (faf *fileAppenderFactory) NewAppender(params map[string]string) (Appender,
 		return nil, errors.New("Invalid " + FAParamMaxSize + " value: " + err.Error())
 	}
 
-	maxLines, err := ParseInt(params[FAParamMaxLines], 1000, maxInt64, maxInt64)
+	maxDiskSpace, err := ParseInt(params[FAParamMaxDiskSpace], 2000, maxInt64, maxInt64)
 	if err != nil {
-		return nil, errors.New("Invalid " + FAParamMaxLines + " value: " + err.Error())
+		return nil, errors.New("Invalid " + FAParamMaxDiskSpace + " value: " + err.Error())
 	}
 
 	rotateStr, ok := params[FAParamRotate]
@@ -140,6 +156,11 @@ func (faf *fileAppenderFactory) NewAppender(params map[string]string) (Appender,
 		}
 	}
 
+	if maxDiskSpace/2 < maxFileSize && rState != rsNone {
+		return nil, errors.New("Invalid " + FAParamMaxDiskSpace +
+			" value. It should be at least twice bigger than " + FAParamMaxSize)
+	}
+
 	app := &fileAppender{}
 	app.msgChannel = make(chan string, buffer)
 	app.controlCh = make(chan bool, 1)
@@ -147,8 +168,9 @@ func (faf *fileAppenderFactory) NewAppender(params map[string]string) (Appender,
 	app.fileName = fileName
 	app.fileAppend = fileAppend
 	app.maxSize = maxFileSize
-	app.maxLines = maxLines
+	app.maxDiskSpace = maxDiskSpace
 	app.rotate = rState
+	app.stat.chunks, app.stat.chunksSize = app.getLogChunks()
 
 	go func() {
 		defer app.close()
@@ -189,14 +211,12 @@ func (fa *fileAppender) Shutdown() {
 func (fa *fileAppender) rotateFile() error {
 	fa.archiveCurrent()
 
-	fa.stat.lines = 0
 	fa.stat.size = 0
 	fa.stat.startTime = time.Now()
 
 	flags := os.O_WRONLY | os.O_CREATE
 	if fa.fileAppend {
 		flags = os.O_WRONLY | os.O_APPEND | os.O_CREATE
-		fa.stat.lines = fa.linesCount()
 		if fInfo, err := os.Stat(fa.fileName); err == nil {
 			fa.stat.size = fInfo.Size()
 		}
@@ -209,20 +229,6 @@ func (fa *fileAppender) rotateFile() error {
 	fa.file = fd
 
 	return nil
-}
-
-func (fa *fileAppender) linesCount() int64 {
-	file, err := os.Open(fa.fileName)
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-
-	var result int64 = 0
-	for scanner := bufio.NewScanner(file); scanner.Scan(); result++ {
-	}
-
-	return result
 }
 
 func (fa *fileAppender) archiveCurrent() {
@@ -238,12 +244,53 @@ func (fa *fileAppender) archiveCurrent() {
 		archiveName += "." + finfo.ModTime().Format("2006-01-02")
 	}
 
-	dir := filepath.Dir(archiveName)
-	baseName := filepath.Base(archiveName)
-	fileInfos, err := ioutil.ReadDir(dir)
 	id := 1
+	if fa.stat.chunks.Len() > 0 {
+		id = fa.stat.chunks.At(fa.stat.chunks.Len()-1).(*chunkInfo).id + 1
+	}
+
+	if fa.file != nil {
+		fa.file.Close()
+		fa.file = nil
+	}
+	archiveName = archiveName + "." + strconv.Itoa(id)
+	err = os.Rename(fa.fileName, archiveName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "File appender %+v: it is impossible to rename file \"%s\" to \"%s\": %s\n", fa, fa.fileName, archiveName, err)
+		return
+	}
+
+	fa.stat.chunks.Add(&chunkInfo{id, archiveName, fa.stat.size})
+	fa.stat.chunksSize += fa.stat.size
+}
+
+func (fa *fileAppender) cutChunks() {
+	if fa.rotate == rsNone {
+		return
+	}
+	for (fa.stat.chunksSize+fa.stat.size) > fa.maxDiskSpace && fa.stat.chunks.Len() > 0 {
+		chunk := fa.stat.chunks.DeleteAt(0).(*chunkInfo)
+		fa.stat.chunksSize -= chunk.size
+		if err := os.Remove(chunk.name); err != nil {
+			fmt.Fprintf(os.Stderr, "Could not remove chunk %s, err=%s", chunk.name, err)
+		}
+	}
+}
+
+func (fa *fileAppender) getLogChunks() (*collections.SortedSlice, int64) {
+	archiveName, _ := filepath.Abs(fa.fileName)
+	nameRegExp := archiveName + "\\.\\d+"
+	if fa.rotate == rsDaily {
+		nameRegExp = archiveName + "\\.\\d{4}-\\d{2}-\\d{2}\\.\\d+"
+	}
+
+	dir := filepath.Dir(archiveName)
+	fileInfos, _ := ioutil.ReadDir(dir)
+
+	chunks, _ := collections.NewSortedSlice(5)
+	var size int64 = 0
 	for _, fInfo := range fileInfos {
-		if fInfo.IsDir() || !strings.HasPrefix(fInfo.Name(), baseName) {
+		if m, _ := regexp.MatchString(nameRegExp, fInfo.Name()); fInfo.IsDir() || !m {
 			continue
 		}
 
@@ -256,20 +303,10 @@ func (fa *fileAppender) archiveCurrent() {
 		if err != nil {
 			continue
 		}
-
-		if fId >= id {
-			id = fId + 1
-		}
+		chunks.Add(&chunkInfo{fId, fInfo.Name(), fInfo.Size()})
+		size += fInfo.Size()
 	}
-	if fa.file != nil {
-		fa.file.Close()
-		fa.file = nil
-	}
-	archiveName = archiveName + "." + strconv.Itoa(id)
-	err = os.Rename(fa.fileName, archiveName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "File appender %+v: it is impossible to rename file \"%s\" to \"%s\": %s\n", fa, fa.fileName, archiveName, err)
-	}
+	return chunks, size
 }
 
 func (fa *fileAppender) isRotationNeeded() bool {
@@ -289,7 +326,7 @@ func (fa *fileAppender) isRotationNeeded() bool {
 }
 
 func (fa *fileAppender) sizeRotation() bool {
-	return fa.stat.size > fa.maxSize || fa.stat.lines > fa.maxLines
+	return fa.stat.size > fa.maxSize
 }
 
 func (fa *fileAppender) timeRotation() bool {
@@ -308,8 +345,8 @@ func (fa *fileAppender) writeMsg(msg string) {
 		return
 	}
 
-	fa.stat.lines++
 	fa.stat.size += int64(n)
+	fa.cutChunks()
 }
 
 func (fa *fileAppender) close() {

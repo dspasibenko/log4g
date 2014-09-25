@@ -110,7 +110,8 @@ func (s *SortedSliceSuite) TestDeleteAt(c *C) {
 	ss.Add(&paramType{3})
 	ss.Add(&paramType{4})
 
-	ss.DeleteAt(1)
+	e := ss.DeleteAt(1).(*paramType)
+	c.Assert(e.v, Equals, 4)
 	c.Assert(ss.Len(), Equals, 1)
 	c.Check(ss.At(0).(*paramType).v, Equals, 3)
 
