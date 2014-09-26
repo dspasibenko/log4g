@@ -194,7 +194,7 @@ func (lc *logConfig) createContexts(params map[string]string) {
 			}
 		}
 
-		bufSize, err := ParseInt(ctxAttributes[cfgContextBufSize], 0, 100000, 100)
+		bufSize, err := ParseInt64(ctxAttributes[cfgContextBufSize], 0, 100000, 100)
 		if err != nil {
 			panic("Incorrect buffer size=" + ctxAttributes[cfgContextBufSize] +
 				" value for context \"" + logName + "\" should be positive integer: " + err.Error())

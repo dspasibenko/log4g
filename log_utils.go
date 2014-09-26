@@ -142,8 +142,13 @@ func ParseBool(value string, defaultValue bool) (bool, error) {
 	return strconv.ParseBool(value)
 }
 
+func ParseInt(value string, min, max, defaultValue int) (int, error) {
+	res, err := ParseInt64(value, int64(min), int64(max), int64(defaultValue))
+	return int(res), err
+}
+
 // ParseInt tries to convert value to int64, or returns default if the value is empty string
-func ParseInt(value string, min, max, defaultValue int64) (int64, error) {
+func ParseInt64(value string, min, max, defaultValue int64) (int64, error) {
 	if defaultValue < min || defaultValue > max || max < min {
 		return 0, errors.New("Inconsistent arguments provided min=" + strconv.FormatInt(min, 10) +
 			", max=" + strconv.FormatInt(max, 10) + ", defaultVelue=" + strconv.FormatInt(defaultValue, 10))

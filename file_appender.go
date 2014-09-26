@@ -135,12 +135,12 @@ func (faf *fileAppenderFactory) NewAppender(params map[string]string) (Appender,
 		return nil, errors.New("Invalid " + FAParamFileAppend + " value: " + err.Error())
 	}
 
-	maxFileSize, err := ParseInt(params[FAParamMaxSize], 1000, maxInt64, maxInt64)
+	maxFileSize, err := ParseInt64(params[FAParamMaxSize], 1000, maxInt64, maxInt64)
 	if err != nil {
 		return nil, errors.New("Invalid " + FAParamMaxSize + " value: " + err.Error())
 	}
 
-	maxDiskSpace, err := ParseInt(params[FAParamMaxDiskSpace], 2000, maxInt64, maxInt64)
+	maxDiskSpace, err := ParseInt64(params[FAParamMaxDiskSpace], 2000, maxInt64, maxInt64)
 	if err != nil {
 		return nil, errors.New("Invalid " + FAParamMaxDiskSpace + " value: " + err.Error())
 	}
