@@ -6,7 +6,7 @@ To start working with log4g you have to import log4g package, get a `Logger` ins
 
 ```
 import "github.com/dspasibenko/log4g"
-unc main() {
+func main() {
 	helloLogger := log4g.GetLogger("Hello")
 	helloLogger.Info("Hello ", "GoLang World")
 	defer log4g.Shutdown()
